@@ -252,9 +252,17 @@ Stated plainly, because a security tool that oversells itself is a liability.
 
 ```bash
 pip install -e ".[dev]"
-pytest          # 90+ tests, including a rug pull and the known false positive
+pytest          # 109 tests, including a rug pull end to end and the known false positive
 ruff check .
 ```
+
+CI also runs two checks that are easy to claim and hard to prove:
+
+- `scripts/check_zero_deps.py` starts an interpreter with `-S` (no `site`, no `site-packages` on
+  `sys.path`) and runs a full scan in it, so the zero-dependency claim is demonstrated rather than
+  asserted.
+- `scripts/check_sarif.py` validates the emitted SARIF against the parts of the 2.1.0 schema that
+  code-scanning services require, so a malformed report fails at the scanner, not at the uploader.
 
 The suite includes regression tests for two real bugs found during development:
 

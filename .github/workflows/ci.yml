@@ -44,26 +44,16 @@ jobs:
         run: pytest -q
 
       - name: The tool must run with no third-party dependencies
-        run: |
-          python - <<'PY'
-          import subprocess, sys, tempfile, pathlib, os
-          # Run the scanner in a subprocess with site-packages removed from the
-          # path, to prove the zero-dependency claim rather than assert it.
-          with tempfile.TemporaryDirectory() as tmp:
-              env = dict(os.environ, PYTHONPATH=str(pathlib.Path.cwd()))
-              out = subprocess.run(
-                  [sys.executable, "-S", "-m", "mcp_sentinel", "scan",
-                   "--tools-json", "tests/fixtures/tools-poisoned.json",
-                   "--format", "json", "--output", f"{tmp}/r.json", "--fail-on", "none"],
-                  env=env, capture_output=True, text=True,
-              )
-              assert out.returncode == 0, out.stderr
-              print("zero-dependency run OK")
-          PY
+        # A shell-independent script: heredocs are bash syntax, and windows-latest
+        # defaults to PowerShell.
+        run: python scripts/check_zero_deps.py
 
   self-scan:
     name: self-scan (SARIF)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write  # required by upload-sarif
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -77,13 +67,7 @@ jobs:
         run: |
           mcp-sentinel scan --tools-json tests/fixtures/tools-poisoned.json \
             --format sarif --output results.sarif --fail-on none
-          python - <<'PY'
-          import json
-          sarif = json.load(open("results.sarif", encoding="utf-8"))
-          results = sarif["runs"][0]["results"]
-          assert results, "the scanner found nothing in a fixture built to be found"
-          print(f"{len(results)} findings, {len(sarif['runs'][0]['tool']['driver']['rules'])} rules")
-          PY
+          python scripts/check_sarif.py results.sarif
 
       - name: Upload SARIF
         uses: github/codeql-action/upload-sarif@v3
