@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from mcp_sentinel.model import LogisticModel, load_default_model
-from mcp_sentinel.models import ServerSpec, ToolSpec
+from mcp_scrutiny.model import LogisticModel, load_default_model
+from mcp_scrutiny.models import ServerSpec, ToolSpec
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -22,7 +22,7 @@ def fixtures_dir() -> Path:
 def model() -> LogisticModel:
     m = load_default_model()
     if m is None:
-        pytest.skip("semantic model not built; run 'mcp-sentinel train'")
+        pytest.skip("semantic model not built; run 'mcp-scrutiny train'")
     return m
 
 

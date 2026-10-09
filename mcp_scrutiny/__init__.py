@@ -1,4 +1,4 @@
-"""mcp-sentinel - static and semantic security scanner for MCP servers.
+"""mcp-scrutiny - static and semantic security scanner for MCP servers.
 
 The scanner answers four questions about an MCP deployment:
 

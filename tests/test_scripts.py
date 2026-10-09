@@ -31,7 +31,7 @@ def test_zero_dependency_check_passes() -> None:
 
 
 def test_sarif_check_accepts_a_real_report(poisoned_dump: Path, tmp_path: Path) -> None:
-    from mcp_sentinel.cli import main
+    from mcp_scrutiny.cli import main
 
     out = tmp_path / "results.sarif"
     main(
@@ -63,7 +63,7 @@ def test_sarif_check_rejects_a_broken_report(tmp_path: Path) -> None:
                 {
                     "tool": {
                         "driver": {
-                            "name": "mcp-sentinel",
+                            "name": "mcp-scrutiny",
                             "rules": [{"id": "r", "defaultConfiguration": {"level": "error"}}],
                         }
                     },

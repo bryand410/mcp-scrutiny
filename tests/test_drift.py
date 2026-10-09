@@ -7,10 +7,10 @@ from pathlib import Path
 
 import pytest
 
-from mcp_sentinel.detectors import ScanContext
-from mcp_sentinel.detectors.drift import DriftDetector
-from mcp_sentinel.models import ScanResult, Severity
-from mcp_sentinel.snapshot import SNAPSHOT_FORMAT, Snapshot
+from mcp_scrutiny.detectors import ScanContext
+from mcp_scrutiny.detectors.drift import DriftDetector
+from mcp_scrutiny.models import ScanResult, Severity
+from mcp_scrutiny.snapshot import SNAPSHOT_FORMAT, Snapshot
 from tests.conftest import make_server, make_tool
 
 

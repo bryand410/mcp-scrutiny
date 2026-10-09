@@ -1,4 +1,4 @@
-"""Core data model for mcp-sentinel."""
+"""Core data model for mcp-scrutiny."""
 
 from __future__ import annotations
 

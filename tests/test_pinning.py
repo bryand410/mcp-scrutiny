@@ -6,10 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from mcp_sentinel.collectors.config import load_config
-from mcp_sentinel.detectors import ScanContext
-from mcp_sentinel.detectors.pinning import PinningDetector
-from mcp_sentinel.models import ScanResult, ServerSpec, Severity
+from mcp_scrutiny.collectors.config import load_config
+from mcp_scrutiny.detectors import ScanContext
+from mcp_scrutiny.detectors.pinning import PinningDetector
+from mcp_scrutiny.models import ScanResult, ServerSpec, Severity
 from tests.conftest import make_server
 
 

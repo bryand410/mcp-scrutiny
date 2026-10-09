@@ -12,7 +12,7 @@ launching the servers:
 
 The capture path exists because a CI job that executes every MCP server in a
 developer's config, with that developer's credentials, in order to audit it, is
-a worse idea than the thing it is auditing. ``mcp-sentinel capture`` produces
+a worse idea than the thing it is auditing. ``mcp-scrutiny capture`` produces
 the dump on a trusted machine; the CI job scans the dump.
 """
 
@@ -90,7 +90,7 @@ def scan_servers(
 
 
 def load_tool_dump(path: str | Path) -> list[ServerSpec]:
-    """Read a capture file produced by ``mcp-sentinel capture``.
+    """Read a capture file produced by ``mcp-scrutiny capture``.
 
     Format::
 

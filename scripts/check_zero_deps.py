@@ -63,7 +63,7 @@ def main() -> int:
                 sys.executable,
                 "-S",
                 "-m",
-                "mcp_sentinel",
+                "mcp_scrutiny",
                 "scan",
                 "--tools-json",
                 str(FIXTURE),

@@ -1,4 +1,4 @@
-"""Allow ``python -m mcp_sentinel``."""
+"""Allow ``python -m mcp_scrutiny``."""
 
 from __future__ import annotations
 

@@ -236,7 +236,7 @@ FEATURE_NAMES: tuple[str, ...] = (
 
 
 def extract_features(tool: Any) -> dict[str, float]:
-    """Return a named feature dict for a :class:`~mcp_sentinel.models.ToolSpec`.
+    """Return a named feature dict for a :class:`~mcp_scrutiny.models.ToolSpec`.
 
     Accepts any object exposing ``name``, ``description``, ``input_schema`` and
     ``annotations`` so the extractor stays decoupled from the data model.

@@ -41,7 +41,7 @@ class DriftDetector:
                     ),
                     server="*",
                     remediation=(
-                        "Run 'mcp-sentinel baseline --config <file> --out mcp-baseline.json', commit "
+                        "Run 'mcp-scrutiny baseline --config <file> --out mcp-baseline.json', commit "
                         "the file, and pass it back with --baseline on every later scan."
                     ),
                 )
@@ -186,7 +186,7 @@ class DriftDetector:
                 )
             )
 
-        ann_fp = _hash({k: v for k, v in tool.annotations.items() if k != "mcp_sentinel_kind"})
+        ann_fp = _hash({k: v for k, v in tool.annotations.items() if k != "mcp_scrutiny_kind"})
         if ann_fp != rec.annotations_fingerprint:
             out.append(
                 Finding(

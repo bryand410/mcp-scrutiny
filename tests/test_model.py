@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from mcp_sentinel.corpus import corpus_stats, holdout_samples, samples
-from mcp_sentinel.features import FEATURE_NAMES, extract_features, vectorise
-from mcp_sentinel.model import LogisticModel, _FakeTool, cross_validate, evaluate, train
+from mcp_scrutiny.corpus import corpus_stats, holdout_samples, samples
+from mcp_scrutiny.features import FEATURE_NAMES, extract_features, vectorise
+from mcp_scrutiny.model import LogisticModel, _FakeTool, cross_validate, evaluate, train
 from tests.conftest import make_tool
 
 

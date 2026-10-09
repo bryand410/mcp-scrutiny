@@ -1,14 +1,57 @@
-# mcp-sentinel
+# mcp-scrutiny
 
 **Static and semantic security scanner for Model Context Protocol servers.**
+Finds unpinned packages, rug pulls, tool poisoning, cross-server shadowing and toxic flows —
+with a trained model for the part keyword scanners cannot do, SARIF output for CI, and
+**zero third-party dependencies**.
 
-Finds unpinned packages, rug pulls, tool poisoning, cross-server shadowing and toxic flows in
-MCP deployments — with a trained model for the part keyword scanners cannot do, and SARIF output
-so findings land in the repository instead of a terminal scrollback.
+[![CI](https://github.com/bryand410/mcp-scrutiny/actions/workflows/ci.yml/badge.svg)](https://github.com/bryand410/mcp-scrutiny/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/mcp-scrutiny.svg)](https://pypi.org/project/mcp-scrutiny/)
+[![Python versions](https://img.shields.io/pypi/pyversions/mcp-scrutiny.svg)](https://pypi.org/project/mcp-scrutiny/)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](#design-notes)
 
 ```
-$ mcp-sentinel scan --config ~/.config/Claude/claude_desktop_config.json --baseline mcp-baseline.json
+$ mcp-scrutiny scan --config ~/.config/Claude/claude_desktop_config.json --baseline mcp-baseline.json
 ```
+
+---
+
+## How this differs from the other MCP scanners
+
+There are several MCP security scanners now, and they are not the same tool. Being precise about
+the difference matters more than being first, so here is an honest comparison — including the
+things the others do that this one does not.
+
+| | mcp-scrutiny | npm `mcp-sentinel` (oktsec) | hosted scanners |
+|---|---|---|---|
+| Detection method | 31-feature trained model + deterministic evasion checks | 177 static rules, delegated to the Aguara service | varies, usually LLM-as-judge |
+| Where tool descriptions go | **nowhere — fully offline** | uploaded to `aguarascan.com` for the deep scan | uploaded to the vendor |
+| Novel phrasing | scored on feature combinations, not signatures | rules only match known patterns | usually yes |
+| Base64 / percent-encoded payloads | decoded and re-scored | not covered by rules | varies |
+| Invisible Unicode (tag chars, bidi) | deterministic check, CRITICAL | not covered by rules | rarely |
+| Cross-server shadowing | yes | per-server scoring | rarely |
+| Toxic flows across servers | yes, aggregated by capability pair | per-server | rarely |
+| Rug-pull / drift detection | SHA-256 baseline, committed | yes | sometimes |
+| Policy enforcement | **no — detection and CI gate only** | yes, YAML policy engine | varies |
+| Runtime dependencies | **none** | Node.js toolchain | SDK + network |
+
+Two things worth saying plainly. The npm package has a **policy engine that this tool does not** —
+it can block tool calls, whereas mcp-scrutiny only reports and sets a CI exit code. And it grades
+servers A–F, which is a better fit than a findings list when you are triaging fifty servers.
+
+What mcp-scrutiny adds is the half that rules cannot cover. The core argument is the one thing
+every scanner in this space gets wrong:
+
+> **You should not have to upload your tool definitions to a third party to find out whether they
+> are malicious.** Tool descriptions name your internal systems, your endpoints and your team's
+> vocabulary. Sending them to a vendor to be scored is a disclosure you did not intend to make.
+> This scanner runs with `-S`, no network, and no dependencies, so it works in an air-gapped CI.
+
+And the second: **rules match known attacks, models score intent.** The `postmark-mcp` payload
+concealed nothing. It said the extra recipient was required for compliance monitoring. No rule
+list catches that sentence until someone writes the rule; a feature model does not need the
+sentence to have been seen before.
 
 ---
 
@@ -54,12 +97,19 @@ reported that a human cannot act on.
 No dependencies. Python 3.11+.
 
 ```bash
-pip install git+https://github.com/bryand410/mcp-sentinel
-# or, from a checkout
-pip install -e .
+pip install mcp-scrutiny
 ```
 
-The trained model ships in `mcp_sentinel/data/model.json`, so a fresh install detects immediately.
+From a checkout:
+
+```bash
+pip install -e ".[dev]"
+```
+
+The trained model ships inside the package (`mcp_scrutiny/data/model.json`), so a fresh install
+detects immediately — no training step, no API key, no network call. A CI job builds the wheel and
+asserts the model file is actually inside it, because a packaged scanner without its model would
+silently degrade to structural checks only.
 
 ---
 
@@ -67,13 +117,13 @@ The trained model ships in `mcp_sentinel/data/model.json`, so a fresh install de
 
 ```bash
 # Scan a config you name
-mcp-sentinel scan --config ~/.cursor/mcp.json
+mcp-scrutiny scan --config ~/.cursor/mcp.json
 
 # Scan every config the known clients use on this machine
-mcp-sentinel scan --discover
+mcp-scrutiny scan --discover
 
 # Ask the servers themselves for their current definitions
-mcp-sentinel scan --config ./mcp.json --probe
+mcp-scrutiny scan --config ./mcp.json --probe
 ```
 
 Exit codes are part of the contract:
@@ -90,11 +140,11 @@ This is the single most effective MCP control, and it takes two commands.
 
 ```bash
 # 1. Record what you have approved, and commit the file
-mcp-sentinel baseline --config ./mcp.json --probe --out mcp-baseline.json
+mcp-scrutiny baseline --config ./mcp.json --probe --out mcp-baseline.json
 git add mcp-baseline.json
 
 # 2. Diff against it on every later scan
-mcp-sentinel scan --config ./mcp.json --probe --baseline mcp-baseline.json
+mcp-scrutiny scan --config ./mcp.json --probe --baseline mcp-baseline.json
 ```
 
 When a tool description changes after approval, the scan reports it as CRITICAL and shows both the
@@ -107,8 +157,8 @@ credentials — in order to audit it is worse than the thing it audits. Capture 
 scan the capture in CI:
 
 ```bash
-mcp-sentinel capture --config ./mcp.json --out mcp-tools.json   # on a trusted machine
-mcp-sentinel scan --tools-json mcp-tools.json --baseline mcp-baseline.json --format sarif --output results.sarif
+mcp-scrutiny capture --config ./mcp.json --out mcp-tools.json   # on a trusted machine
+mcp-scrutiny scan --tools-json mcp-tools.json --baseline mcp-baseline.json --format sarif --output results.sarif
 ```
 
 ### Options
@@ -128,11 +178,11 @@ mcp-sentinel scan --tools-json mcp-tools.json --baseline mcp-baseline.json --for
 
 ## CI integration
 
-`.github/workflows/mcp-sentinel.yml` in this repository is the reference. The essentials:
+`.github/workflows/mcp-scrutiny.yml` in this repository is the reference. The essentials:
 
 ```yaml
 - run: pip install .
-- run: mcp-sentinel scan --tools-json mcp-tools.json --baseline mcp-baseline.json
+- run: mcp-scrutiny scan --tools-json mcp-tools.json --baseline mcp-baseline.json
        --format sarif --output results.sarif --fail-on high
 - uses: github/codeql-action/upload-sarif@v3
   if: always()
@@ -181,7 +231,7 @@ Because the features are named, a finding can say *which* of them drove the deci
 | 5-fold cross-validation F1 | **0.87** | The honest generalisation estimate: precision 0.95, recall 0.80 |
 | Held-out set (20 unseen examples) | 1.00 | Supportive, but 20 examples is 20 examples |
 
-The corpus is 45 malicious and 62 benign descriptions in `mcp_sentinel/corpus.py`, plus 20 held-out
+The corpus is 45 malicious and 62 benign descriptions in `mcp_scrutiny/corpus.py`, plus 20 held-out
 examples never used for fitting. The benign half is deliberately adversarial against the model: it
 contains the exact phrases that make naive scanners fire — *"You MUST call this function first"*,
 *"Never pass credentials in the query string"*, *"Always returns the full record set"* — because a
@@ -190,7 +240,7 @@ scanner that flags those gets disabled within a week.
 Reproduce the numbers:
 
 ```bash
-mcp-sentinel train
+mcp-scrutiny train
 ```
 
 ### What it catches that keywords cannot

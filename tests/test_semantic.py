@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from mcp_sentinel.detectors import ScanContext
-from mcp_sentinel.detectors.semantic import SemanticDetector
-from mcp_sentinel.model import LogisticModel
-from mcp_sentinel.models import ScanResult, Severity
+from mcp_scrutiny.detectors import ScanContext
+from mcp_scrutiny.detectors.semantic import SemanticDetector
+from mcp_scrutiny.model import LogisticModel
+from mcp_scrutiny.models import ScanResult, Severity
 from tests.conftest import make_server, make_tool
 
 
@@ -113,7 +113,7 @@ def test_threshold_is_configurable(model: LogisticModel) -> None:
 
 
 def test_poisoned_fixture_is_detected(poisoned_dump, model: LogisticModel) -> None:
-    from mcp_sentinel.scanner import load_tool_dump
+    from mcp_scrutiny.scanner import load_tool_dump
 
     result = ScanResult(servers=load_tool_dump(poisoned_dump))
     findings = SemanticDetector().run(result, ScanContext(model=model))

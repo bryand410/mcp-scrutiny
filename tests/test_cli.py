@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from mcp_sentinel.cli import EXIT_ERROR, EXIT_FINDINGS, EXIT_OK, main
+from mcp_scrutiny.cli import EXIT_ERROR, EXIT_FINDINGS, EXIT_OK, main
 
 
 def test_detectors_command(capsys: pytest.CaptureFixture[str]) -> None:
@@ -109,7 +109,7 @@ def test_json_output_is_valid_and_complete(poisoned_dump: Path, tmp_path: Path, 
     main(["scan", "--tools-json", str(poisoned_dump), "--format", "json", "--output", str(out_file)])
     capsys.readouterr()
     payload = json.loads(out_file.read_text(encoding="utf-8"))
-    assert payload["tool"]["name"] == "mcp-sentinel"
+    assert payload["tool"]["name"] == "mcp-scrutiny"
     assert payload["summary"]["servers"] > 0
     assert payload["summary"]["tools"] > 0
     assert payload["summary"]["findings"] > 0
@@ -123,13 +123,13 @@ def test_sarif_output_is_valid_sarif(poisoned_dump: Path, tmp_path: Path, capsys
     sarif = json.loads(out_file.read_text(encoding="utf-8"))
     assert sarif["version"] == "2.1.0"
     run = sarif["runs"][0]
-    assert run["tool"]["driver"]["name"] == "mcp-sentinel"
+    assert run["tool"]["driver"]["name"] == "mcp-scrutiny"
     assert run["tool"]["driver"]["rules"]
     levels = {r["level"] for r in run["results"]}
     assert levels <= {"error", "warning", "note"}
     assert "error" in levels
     for result in run["results"]:
-        assert result["ruleId"].startswith("mcp-sentinel/")
+        assert result["ruleId"].startswith("mcp-scrutiny/")
         assert result["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
 
 

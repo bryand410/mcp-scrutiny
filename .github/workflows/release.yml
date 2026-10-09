@@ -1,0 +1,77 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type 'publish' to upload to PyPI"
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build and verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install build tooling
+        run: python -m pip install --upgrade build twine
+
+      - name: Build sdist and wheel
+        run: python -m build
+
+      - name: Check the metadata twine will accept
+        run: twine check dist/*
+
+      - name: Verify the wheel is sound before it can be published
+        run: python scripts/check_wheel.py dist
+
+      - name: Install the wheel and run a real scan from it
+        # The end-to-end check: install the artifact the way a user would, then
+        # use it. This is what catches a packaging bug that unit tests cannot see.
+        run: |
+          python -m venv /tmp/verify
+          /tmp/verify/bin/pip install --quiet dist/*.whl
+          /tmp/verify/bin/mcp-scrutiny --version
+          /tmp/verify/bin/mcp-scrutiny scan \
+            --tools-json tests/fixtures/tools-poisoned.json \
+            --fail-on critical --no-color
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    name: publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    # Trusted publishing: no API token is stored anywhere. PyPI verifies the
+    # workflow's OIDC identity instead, which is the only kind of credential
+    # that cannot leak from a repository secret.
+    environment:
+      name: pypi
+      url: https://pypi.org/p/mcp-scrutiny
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # Fail rather than silently skip if the version already exists.
+          skip-existing: false

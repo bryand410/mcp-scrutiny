@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from mcp_sentinel.features import (
+from mcp_scrutiny.features import (
     FEATURE_NAMES,
     confusables,
     decode_candidates,

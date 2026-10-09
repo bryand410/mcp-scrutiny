@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from mcp_sentinel.collectors.config import ConfigError, load_config, servers_from_mapping
+from mcp_scrutiny.collectors.config import ConfigError, load_config, servers_from_mapping
 
 
 def test_parses_claude_desktop_shape(tmp_path: Path) -> None:

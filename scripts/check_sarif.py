@@ -50,7 +50,7 @@ def main(argv: list[str]) -> int:
 
     run = runs[0]
     driver = run.get("tool", {}).get("driver", {})
-    if driver.get("name") != "mcp-sentinel":
+    if driver.get("name") != "mcp-scrutiny":
         return fail(f"tool.driver.name is {driver.get('name')!r}")
 
     rules = driver.get("rules")

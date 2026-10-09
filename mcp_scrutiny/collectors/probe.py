@@ -31,7 +31,7 @@ from ..models import ServerSpec, ToolSpec
 __all__ = ["PROTOCOL_VERSION", "ProbeError", "probe_server"]
 
 PROTOCOL_VERSION = "2025-06-18"
-_CLIENT_INFO = {"name": "mcp-sentinel", "version": "0.1.0"}
+_CLIENT_INFO = {"name": "mcp-scrutiny", "version": "0.1.0"}
 _DEFAULT_TIMEOUT = 20.0
 
 
@@ -84,7 +84,7 @@ def _tools_from_payload(server: str, payload: dict[str, Any], kind: str) -> list
         if not isinstance(annotations, dict):
             annotations = {}
         annotations = dict(annotations)
-        annotations["mcp_sentinel_kind"] = kind
+        annotations["mcp_scrutiny_kind"] = kind
         schema = item.get("inputSchema") or item.get("arguments") or {}
         out.append(
             ToolSpec(

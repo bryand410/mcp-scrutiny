@@ -62,7 +62,7 @@ class SemanticDetector:
                         "tool poisoning in prose is not being detected."
                     ),
                     server="*",
-                    remediation="Run 'mcp-sentinel train' to build the model, or pass --model <path>.",
+                    remediation="Run 'mcp-scrutiny train' to build the model, or pass --model <path>.",
                 )
             )
             return out

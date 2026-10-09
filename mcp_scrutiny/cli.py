@@ -42,13 +42,13 @@ _FAIL_ON = {
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="mcp-sentinel",
+        prog="mcp-scrutiny",
         description=(
             "Static and semantic security scanner for Model Context Protocol servers. "
             "Finds unpinned packages, rug pulls, tool poisoning, shadowing and toxic flows."
         ),
     )
-    parser.add_argument("--version", action="version", version=f"mcp-sentinel {__version__}")
+    parser.add_argument("--version", action="version", version=f"mcp-scrutiny {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     # -- scan ----------------------------------------------------------- #

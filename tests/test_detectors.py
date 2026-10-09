@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from mcp_sentinel.detectors import ScanContext
-from mcp_sentinel.detectors.shadowing import ShadowingDetector
-from mcp_sentinel.detectors.toxic_flow import ToxicFlowDetector, tag_capabilities
-from mcp_sentinel.models import ScanResult, Severity
+from mcp_scrutiny.detectors import ScanContext
+from mcp_scrutiny.detectors.shadowing import ShadowingDetector
+from mcp_scrutiny.detectors.toxic_flow import ToxicFlowDetector, tag_capabilities
+from mcp_scrutiny.models import ScanResult, Severity
 from tests.conftest import make_server, make_tool
 
 

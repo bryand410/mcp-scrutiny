@@ -48,7 +48,7 @@ def render_text(result: ScanResult, *, colour: bool = False, show_evidence: bool
     total_tools = len(result.tools)
 
     lines.append("")
-    lines.append(_paint("mcp-sentinel", Severity.HIGH, colour) + f"  v{__version__}")
+    lines.append(_paint("mcp-scrutiny", Severity.HIGH, colour) + f"  v{__version__}")
     lines.append(
         f"  {len(result.servers)} server(s), {total_tools} tool(s), "
         f"{len(result.findings)} finding(s)"
@@ -94,7 +94,7 @@ def _render_finding(finding: Finding, *, colour: bool, show_evidence: bool) -> s
 
 def render_json(result: ScanResult) -> str:
     """Stable machine-readable output."""
-    payload: dict[str, Any] = {"tool": {"name": "mcp-sentinel", "version": __version__}}
+    payload: dict[str, Any] = {"tool": {"name": "mcp-scrutiny", "version": __version__}}
     payload.update(result.to_dict())
     return json.dumps(payload, indent=2, ensure_ascii=False, default=str)
 
@@ -105,7 +105,7 @@ def render_sarif(result: ScanResult, *, config_uri: str = "mcp.json") -> str:
     results: list[dict[str, Any]] = []
 
     for finding in result.findings:
-        rule_id = f"mcp-sentinel/{finding.detector}"
+        rule_id = f"mcp-scrutiny/{finding.detector}"
         rules.setdefault(
             rule_id,
             {
@@ -115,7 +115,7 @@ def render_sarif(result: ScanResult, *, config_uri: str = "mcp.json") -> str:
                 "fullDescription": {
                     "text": _detector_description(finding.detector),
                 },
-                "helpUri": "https://github.com/bryand410/mcp-sentinel#detectors",
+                "helpUri": "https://github.com/bryand410/mcp-scrutiny#detectors",
                 "defaultConfiguration": {"level": _SARIF_LEVEL[finding.severity]},
             },
         )
@@ -151,9 +151,9 @@ def render_sarif(result: ScanResult, *, config_uri: str = "mcp.json") -> str:
             {
                 "tool": {
                     "driver": {
-                        "name": "mcp-sentinel",
+                        "name": "mcp-scrutiny",
                         "version": __version__,
-                        "informationUri": "https://github.com/bryand410/mcp-sentinel",
+                        "informationUri": "https://github.com/bryand410/mcp-scrutiny",
                         "rules": list(rules.values()),
                     }
                 },

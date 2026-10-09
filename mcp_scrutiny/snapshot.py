@@ -47,7 +47,7 @@ class ToolRecord:
             description_fingerprint=tool.description_fingerprint,
             schema_fingerprint=_hash_json(tool.input_schema),
             annotations_fingerprint=_hash_json(
-                {k: v for k, v in tool.annotations.items() if k != "mcp_sentinel_kind"}
+                {k: v for k, v in tool.annotations.items() if k != "mcp_scrutiny_kind"}
             ),
             preview=tool.description[:_PREVIEW_CHARS],
         )
@@ -116,7 +116,7 @@ class Snapshot:
         if fmt != SNAPSHOT_FORMAT:
             raise ValueError(
                 f"unsupported snapshot format {fmt}; this build understands {SNAPSHOT_FORMAT}. "
-                "Re-create the baseline with 'mcp-sentinel baseline'."
+                "Re-create the baseline with 'mcp-scrutiny baseline'."
             )
         servers: dict[str, dict[str, ToolRecord]] = {}
         for server, tools in (data.get("servers") or {}).items():

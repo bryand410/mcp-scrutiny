@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "mcp-sentinel"
+name = "mcp-scrutiny"
 version = "0.1.0"
 description = "Static and semantic security scanner for Model Context Protocol servers"
 readme = "README.md"
@@ -29,17 +29,17 @@ dependencies = []
 dev = ["pytest>=8.0", "ruff>=0.6"]
 
 [project.scripts]
-mcp-sentinel = "mcp_sentinel.cli:main"
+mcp-scrutiny = "mcp_scrutiny.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/bryand410/mcp-sentinel"
-Issues = "https://github.com/bryand410/mcp-sentinel/issues"
+Homepage = "https://github.com/bryand410/mcp-scrutiny"
+Issues = "https://github.com/bryand410/mcp-scrutiny/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["mcp_sentinel"]
+packages = ["mcp_scrutiny"]
 
 [tool.hatch.build.targets.wheel.force-include]
-"mcp_sentinel/data/model.json" = "mcp_sentinel/data/model.json"
+"mcp_scrutiny/data/model.json" = "mcp_scrutiny/data/model.json"
 
 [tool.ruff]
 line-length = 110
@@ -54,7 +54,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"mcp_sentinel/corpus.py" = ["E501"]
+"mcp_scrutiny/corpus.py" = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
