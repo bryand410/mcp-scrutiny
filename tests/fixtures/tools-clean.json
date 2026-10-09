@@ -1,0 +1,88 @@
+{
+  "servers": [
+    {
+      "name": "filesystem",
+      "transport": "stdio",
+      "command": "uvx",
+      "args": ["mcp-server-filesystem==2025.8.21"],
+      "env": {},
+      "tools": [
+        {
+          "name": "read_file",
+          "description": "Read the complete contents of a file from the file system. Handles various text encodings and provides detailed error messages if the file cannot be read.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "path": { "type": "string", "description": "Path to the file to read" }
+            },
+            "required": ["path"]
+          },
+          "annotations": { "readOnlyHint": true }
+        },
+        {
+          "name": "write_file",
+          "description": "Write content to a file in the allowed directories. Creates the file if it does not exist and overwrites it otherwise.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "path": { "type": "string" },
+              "content": { "type": "string" }
+            },
+            "required": ["path", "content"]
+          },
+          "annotations": { "destructiveHint": true }
+        },
+        {
+          "name": "list_directory",
+          "description": "List the contents of a directory, returning file names, sizes and modification times.",
+          "inputSchema": {
+            "type": "object",
+            "properties": { "path": { "type": "string" } },
+            "required": ["path"]
+          },
+          "annotations": { "readOnlyHint": true }
+        }
+      ]
+    },
+    {
+      "name": "weather",
+      "transport": "http",
+      "url": "https://mcp.weather.example.com/mcp",
+      "env": { "WEATHER_API_TOKEN": "${WEATHER_API_TOKEN}" },
+      "tools": [
+        {
+          "name": "get_forecast",
+          "description": "Returns the forecast for the given city over the requested number of days.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "city": { "type": "string" },
+              "days": { "type": "integer", "default": 3 }
+            },
+            "required": ["city"]
+          },
+          "annotations": { "readOnlyHint": true }
+        }
+      ]
+    },
+    {
+      "name": "time",
+      "transport": "stdio",
+      "command": "uvx",
+      "args": ["mcp-server-time==2025.7.1"],
+      "env": {},
+      "tools": [
+        {
+          "name": "get_current_time",
+          "description": "Returns the current time in the specified IANA timezone.",
+          "inputSchema": {
+            "type": "object",
+            "properties": { "timezone": { "type": "string" } },
+            "required": ["timezone"]
+          },
+          "annotations": { "readOnlyHint": true }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly, so a new attack shape or a broken dependency surfaces without a commit.
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.11", "3.12", "3.13"]
+        include:
+          - os: windows-latest
+            python-version: "3.13"
+          - os: macos-latest
+            python-version: "3.13"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Test
+        run: pytest -q
+
+      - name: The tool must run with no third-party dependencies
+        run: |
+          python - <<'PY'
+          import subprocess, sys, tempfile, pathlib, os
+          # Run the scanner in a subprocess with site-packages removed from the
+          # path, to prove the zero-dependency claim rather than assert it.
+          with tempfile.TemporaryDirectory() as tmp:
+              env = dict(os.environ, PYTHONPATH=str(pathlib.Path.cwd()))
+              out = subprocess.run(
+                  [sys.executable, "-S", "-m", "mcp_sentinel", "scan",
+                   "--tools-json", "tests/fixtures/tools-poisoned.json",
+                   "--format", "json", "--output", f"{tmp}/r.json", "--fail-on", "none"],
+                  env=env, capture_output=True, text=True,
+              )
+              assert out.returncode == 0, out.stderr
+              print("zero-dependency run OK")
+          PY
+
+  self-scan:
+    name: self-scan (SARIF)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install .
+
+      - name: Scan the known-bad fixture
+        # --fail-on none: this fixture is *supposed* to be full of findings, and
+        # the job's purpose is to prove the SARIF upload works, not to gate.
+        run: |
+          mcp-sentinel scan --tools-json tests/fixtures/tools-poisoned.json \
+            --format sarif --output results.sarif --fail-on none
+          python - <<'PY'
+          import json
+          sarif = json.load(open("results.sarif", encoding="utf-8"))
+          results = sarif["runs"][0]["results"]
+          assert results, "the scanner found nothing in a fixture built to be found"
+          print(f"{len(results)} findings, {len(sarif['runs'][0]['tool']['driver']['rules'])} rules")
+          PY
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: results.sarif
+          category: mcp-sentinel
+
+      - name: The clean fixture must stay clean
+        # The regression guard that matters most: a scanner that cries wolf gets
+        # switched off, so this job fails if the baseline deployment goes noisy.
+        run: |
+          mcp-sentinel baseline --tools-json tests/fixtures/tools-clean.json --out baseline.json
+          mcp-sentinel scan --tools-json tests/fixtures/tools-clean.json \
+            --baseline baseline.json --fail-on low

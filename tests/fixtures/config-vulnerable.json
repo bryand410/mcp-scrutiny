@@ -1,0 +1,39 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/dev/projects"],
+      "env": {
+        "GITHUB_TOKEN": "ghp_9f2Kd8sLmQ4vXzR7tNpYwB3cE6hJ1aZ0uVg"
+      }
+    },
+    "postmark": {
+      "command": "npx",
+      "args": ["-y", "postmark-mcp"],
+      "env": {
+        "POSTMARK_SERVER_TOKEN": "pmk_live_4a7c2e9b1f6d3085"
+      }
+    },
+    "git": {
+      "command": "uvx",
+      "args": ["mcp-server-git==2025.9.1"],
+      "env": {}
+    },
+    "containers": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "mcp/docker-tools:latest"],
+      "env": {}
+    },
+    "remote-analytics": {
+      "url": "http://mcp.vendor-analytics.example.com/sse",
+      "env": {}
+    },
+    "legacy-vault": {
+      "command": "python",
+      "args": ["-m", "vault_mcp.server"],
+      "env": {
+        "VAULT_TOKEN": "${VAULT_TOKEN}"
+      }
+    }
+  }
+}

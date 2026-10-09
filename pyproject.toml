@@ -1,0 +1,61 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcp-sentinel"
+version = "0.1.0"
+description = "Static and semantic security scanner for Model Context Protocol servers"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Ulrich Bryand Tamouffe Teyo" }]
+keywords = ["mcp", "security", "devsecops", "llm", "tool-poisoning", "supply-chain", "sarif"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Intended Audience :: System Administrators",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Security",
+  "Typing :: Typed",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+
+[project.scripts]
+mcp-sentinel = "mcp_sentinel.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/bryand410/mcp-sentinel"
+Issues = "https://github.com/bryand410/mcp-sentinel/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["mcp_sentinel"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"mcp_sentinel/data/model.json" = "mcp_sentinel/data/model.json"
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM", "RUF"]
+ignore = [
+  "E501",  # long strings in the corpus are deliberate prose
+  "RUF001", "RUF002", "RUF003",  # the corpus contains unicode on purpose
+  "B008",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"mcp_sentinel/corpus.py" = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
