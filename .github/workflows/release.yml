@@ -38,14 +38,23 @@ jobs:
 
       - name: Install the wheel and run a real scan from it
         # The end-to-end check: install the artifact the way a user would, then
-        # use it. This is what catches a packaging bug that unit tests cannot see.
+        # use it. Exit 1 is the expected result here, because the fixture
+        # contains critical findings and --fail-on critical is the contract.
         run: |
           python -m venv /tmp/verify
           /tmp/verify/bin/pip install --quiet dist/*.whl
           /tmp/verify/bin/mcp-scrutiny --version
+
+          set +e
           /tmp/verify/bin/mcp-scrutiny scan \
             --tools-json tests/fixtures/tools-poisoned.json \
             --fail-on critical --no-color
+          code=$?
+          set -e
+          if [ "$code" -ne 1 ]; then
+            echo "expected exit 1 (critical findings found), got $code"
+            exit 1
+          fi
 
       - uses: actions/upload-artifact@v4
         with:

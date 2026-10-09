@@ -65,16 +65,27 @@ jobs:
         run: python scripts/check_wheel.py dist
 
       - name: Install the wheel in a clean venv and scan with it
-        # The only check that exercises what a user actually receives.
+        # The only check that exercises what a user actually receives. The exit
+        # code is asserted rather than ignored: on this fixture, exit 1 means the
+        # installed wheel detected the critical findings, which is the contract.
         run: |
           python -m venv /tmp/verify
           /tmp/verify/bin/pip install --quiet dist/*.whl
           echo "--- installed packages ---"
           /tmp/verify/bin/pip list --format=freeze
           /tmp/verify/bin/mcp-scrutiny --version
+
+          set +e
           /tmp/verify/bin/mcp-scrutiny scan \
             --tools-json tests/fixtures/tools-poisoned.json \
             --fail-on critical --no-color
+          code=$?
+          set -e
+          if [ "$code" -ne 1 ]; then
+            echo "expected exit 1 (critical findings found), got $code"
+            exit 1
+          fi
+          echo "installed wheel detected the critical findings, as expected"
 
   self-scan:
     name: self-scan (SARIF)
