@@ -70,6 +70,35 @@ than a sentence.
 
 Not here — see [SECURITY.md](SECURITY.md). Do not open a public issue for a detector bypass.
 
+## Releasing
+
+Two steps, and they are separate on purpose.
+
+**1. Tag it.** The tag builds, verifies and attaches the wheel and sdist to the GitHub release, so
+the package becomes installable immediately:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+That is enough for anyone to install:
+
+```bash
+pip install https://github.com/bryand410/mcp-scrutiny/releases/download/v0.1.0/mcp_scrutiny-0.1.0-py3-none-any.whl
+```
+
+**2. Publish to PyPI, deliberately.** A tag does *not* upload to the index. Go to
+**Actions → Release → Run workflow**, select the tag, and type `publish` in the confirm box.
+
+The indirection is the point. PyPI is a one-way door — a published version cannot be replaced, only
+yanked — so an accidental tag must not be able to push a release. PyPI adds discovery, not
+availability; the release asset is already installable before you take this step.
+
+The workflow uses trusted publishing over OIDC, so no API token exists anywhere. For this to work,
+the PyPI project needs a pending publisher configured with: owner `bryand410`, repository
+`mcp-scrutiny`, workflow `release.yml`, environment `pypi`.
+
 ## Style
 
 - Python 3.11+, standard library only. A pull request that adds a runtime dependency will be

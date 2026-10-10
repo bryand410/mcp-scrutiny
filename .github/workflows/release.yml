@@ -61,9 +61,49 @@ jobs:
           name: dist
           path: dist/
 
+  release:
+    name: attach the artifacts to the GitHub release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Create or update the release with the installable artifacts
+        # This is what makes the package installable before PyPI is configured:
+        #
+        #   pip install https://github.com/bryand410/mcp-scrutiny/releases/download/v0.1.0/mcp_scrutiny-0.1.0-py3-none-any.whl
+        #
+        # The tag alone is therefore enough to ship something a stranger can
+        # install. PyPI adds discovery, not availability.
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
+          generate_release_notes: true
+
   publish:
     name: publish to PyPI
     needs: build
+    # Deliberately manual, and deliberately not on tag push.
+    #
+    # A tag builds and attaches the wheel to the GitHub release, so the package
+    # is installable immediately and an accidental tag can never push to the
+    # index. Uploading to PyPI requires typing "publish" in the Actions UI.
+    # The `confirm` input existed from the first version of this file and was
+    # never wired up; it is now the gate it claims to be.
+    #
+    # To publish: Actions -> Release -> Run workflow -> select the tag v0.1.0
+    # -> type "publish".
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      && github.event.inputs.confirm == 'publish'
     runs-on: ubuntu-latest
     # Trusted publishing: no API token is stored anywhere. PyPI verifies the
     # workflow's OIDC identity instead, which is the only kind of credential
