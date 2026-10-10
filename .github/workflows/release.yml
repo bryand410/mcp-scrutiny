@@ -19,6 +19,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve the tag being released
+        # On a manual run the workflow is dispatched from a branch, and GitHub's
+        # "Use workflow from" dropdown makes picking a tag an extra step that is
+        # easy to miss. So the manual path checks out the newest v* tag itself:
+        # leave the branch as main, type "publish", and the right commit is
+        # built without having to know which one that is.
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag=$(git tag -l 'v*' --sort=-v:refname | head -n1)
+            if [ -z "$tag" ]; then
+              echo "no v* tag found; tag a release before publishing"
+              exit 1
+            fi
+            echo "manual dispatch: building $tag"
+            git checkout --detach "refs/tags/$tag"
+          else
+            echo "tag push: building ${{ github.ref_name }}"
+          fi
 
       - uses: actions/setup-python@v5
         with:
