@@ -227,15 +227,24 @@ Because the features are named, a finding can say *which* of them drove the deci
 
 | Metric | Value | What it means |
 |---|---|---|
-| Training accuracy | 1.00 | **Not a result.** A 31-feature model on a 107-example corpus memorises it. |
-| 5-fold cross-validation F1 | **0.87** | The honest generalisation estimate: precision 0.95, recall 0.80 |
-| Held-out set (20 unseen examples) | 1.00 | Supportive, but 20 examples is 20 examples |
+| Training accuracy | 0.99 | **Not a result.** A 31-feature model on a 119-example corpus memorises it. |
+| 5-fold cross-validation F1 | **0.88** | The honest generalisation estimate: precision 0.91, recall 0.86 |
+| Held-out set (24 unseen examples) | 1.00 | Supportive, but 24 examples is 24 examples |
 
-The corpus is 45 malicious and 62 benign descriptions in `mcp_scrutiny/corpus.py`, plus 20 held-out
+The corpus is 49 malicious and 70 benign descriptions in `mcp_scrutiny/corpus.py`, plus 24 held-out
 examples never used for fitting. The benign half is deliberately adversarial against the model: it
 contains the exact phrases that make naive scanners fire — *"You MUST call this function first"*,
 *"Never pass credentials in the query string"*, *"Always returns the full record set"* — because a
 scanner that flags those gets disabled within a week.
+
+**Why the corpus contains French.** The first release capped out at 228 characters and contained no
+text in any language other than English. Scanning a real, well-documented French-language Mobile
+Money server on 2026-10-10 produced a false positive on an ordinary `request_payment` description
+(p=0.84): `log_len` sat **6.7 standard deviations** outside the training distribution, so the model
+had learned that *long means malicious*. A detector that flags every properly documented tool — and
+that has never seen French — is unusable for a large part of the world. The corpus now carries long,
+procedural, `Args:`-blocked descriptions in both languages, and long malicious ones alongside them so
+that length carries no signal in either direction. That case is pinned by four regression tests.
 
 Reproduce the numbers:
 
@@ -261,11 +270,16 @@ mcp-scrutiny train
 
 Stated plainly, because a security tool that oversells itself is a liability.
 
-- **The corpus is small and hand-built.** Cross-validation F1 is 0.87 on 107 examples. That is
+- **The corpus is small and hand-built.** Cross-validation F1 is 0.88 on 119 examples. That is
   enough to catch the documented attack shapes and not enough to claim production-grade coverage.
   Treat a low score as a prompt to read the description, not as a verdict.
-- **One known false positive.** A legitimate tool description that *describes a security control*
-  while naming secret-looking keys can score above 0.5:
+- **The steering patterns are English-only, and this is the sharpest remaining limit.** The corpus
+  now contains French, but `_INJECTION`, `_CONCEALMENT` and `_EXFILTRATION` in `features.py` still
+  match English wording. A French description that says *"ignorez les instructions précédentes"* is
+  **not** caught — verified, `p=0.19` against a threshold of 0.5. Non-English prompt injection is
+  currently invisible to this scanner. Tracked as a `good first issue`.
+- **One known false positive class remains.** A legitimate tool description that *describes a
+  security control* while naming secret-looking keys can score above 0.5:
 
   > *"Reads the value of an environment variable from the server's own process, for diagnostics.
   > Never returns values for keys containing SECRET or TOKEN."*
@@ -302,7 +316,7 @@ Stated plainly, because a security tool that oversells itself is a liability.
 
 ```bash
 pip install -e ".[dev]"
-pytest          # 109 tests, including a rug pull end to end and the known false positive
+pytest          # 122 tests, including a rug pull end to end and the known false positive
 ruff check .
 ```
 

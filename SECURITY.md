@@ -45,9 +45,13 @@ The latest released version on PyPI. Fixes are not backported.
 ## A note on the model
 
 The semantic detector is a logistic regression trained on a small, hand-built corpus. It is
-reported honestly: 5-fold cross-validation F1 is 0.87, not 1.00, and the README's Limitations
-section lists the false positive that is known and unresolved. If you find a bypass, that is a
-useful result and not an embarrassment — it is how the corpus grows.
+reported honestly: 5-fold cross-validation F1 is 0.88, not 1.00, and the README's Limitations
+section lists what is known and unresolved. If you find a bypass, that is a useful result and not
+an embarrassment — it is how the corpus grows.
+
+Two bypasses are known today and both are worth your time: **non-English prompt injection is
+invisible** (the steering patterns in `features.py` match English only), and a description that
+names secret-looking keys while describing a security control can still cross the threshold.
 
 If you report a bypass, the fix will be a new feature or a new labelled example, and the example
 will be added to `mcp_scrutiny/corpus.py` with a regression test. You will be credited unless you
