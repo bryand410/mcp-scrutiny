@@ -6,6 +6,7 @@ with a trained model for the part keyword scanners cannot do, SARIF output for C
 **zero third-party dependencies**.
 
 [![CI](https://github.com/bryand410/mcp-scrutiny/actions/workflows/ci.yml/badge.svg)](https://github.com/bryand410/mcp-scrutiny/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/bryand410/mcp-scrutiny)](https://github.com/bryand410/mcp-scrutiny/releases/latest)
 [![PyPI](https://img.shields.io/pypi/v/mcp-scrutiny.svg)](https://pypi.org/project/mcp-scrutiny/)
 [![Python versions](https://img.shields.io/pypi/pyversions/mcp-scrutiny.svg)](https://pypi.org/project/mcp-scrutiny/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
