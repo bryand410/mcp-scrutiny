@@ -1,0 +1,341 @@
+{
+  "servers": [
+    {
+      "name": "orange-money",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@theyahia/orange-money-mcp"
+      ],
+      "env": {
+        "ORANGE_MONEY_COUNTRY": "cm",
+        "ORANGE_MONEY_CLIENT_ID": "${ORANGE_MONEY_CLIENT_ID}",
+        "ORANGE_MONEY_CLIENT_SECRET": "${ORANGE_MONEY_CLIENT_SECRET}",
+        "ORANGE_MONEY_MERCHANT_KEY": "${ORANGE_MONEY_MERCHANT_KEY}"
+      },
+      "tools": [
+        {
+          "name": "create_webpayment",
+          "description": "Create an Orange Money WebPay session - returns a redirect URL where the customer authenticates with their Orange Money PIN to confirm the payment. Required: amount (in local currency XOF/XAF), order_id (unique), URL to return to after payment.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "amount": {
+                "type": "string"
+              },
+              "order_id": {
+                "type": "string"
+              },
+              "return_url": {
+                "type": "string"
+              },
+              "reference": {
+                "type": "string"
+              },
+              "notif_url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "amount",
+              "order_id",
+              "return_url"
+            ]
+          }
+        },
+        {
+          "name": "get_payment_status",
+          "description": "Get the status of an Orange Money WebPay session by order_id + amount + pay_token (returned by create_webpayment).",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "order_id": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "string"
+              },
+              "pay_token": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "order_id",
+              "amount",
+              "pay_token"
+            ]
+          }
+        },
+        {
+          "name": "cashin",
+          "description": "Push money TO a customer's Orange Money wallet (B2B disbursement). Requires the customer's MSISDN (phone number).",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "partner_id": {
+                "type": "string"
+              },
+              "to_msisdn": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "string"
+              },
+              "reference": {
+                "type": "string"
+              },
+              "pin": {
+                "type": "string",
+                "description": "Partner PIN if required"
+              }
+            },
+            "required": [
+              "partner_id",
+              "to_msisdn",
+              "amount",
+              "reference"
+            ]
+          }
+        },
+        {
+          "name": "cashout",
+          "description": "Pull money FROM a customer's Orange Money wallet (B2B collection). Customer must have pre-authorized the merchant.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "partner_id": {
+                "type": "string",
+                "description": "Your partner ID"
+              },
+              "from_msisdn": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "string"
+              },
+              "reference": {
+                "type": "string"
+              },
+              "pin": {
+                "type": "string",
+                "description": "Partner PIN if required"
+              }
+            },
+            "required": [
+              "partner_id",
+              "from_msisdn",
+              "amount",
+              "reference"
+            ]
+          }
+        },
+        {
+          "name": "transfer",
+          "description": "Transfer money between two Orange Money wallets via the merchant API.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "partner_id": {
+                "type": "string"
+              },
+              "from_msisdn": {
+                "type": "string",
+                "description": "Sender MSISDN"
+              },
+              "to_msisdn": {
+                "type": "string",
+                "description": "Recipient MSISDN"
+              },
+              "amount": {
+                "type": "string",
+                "description": "Amount as string"
+              },
+              "reference": {
+                "type": "string",
+                "description": "Unique transfer reference"
+              },
+              "pin": {
+                "type": "string",
+                "description": "Sender PIN if required"
+              }
+            },
+            "required": [
+              "partner_id",
+              "from_msisdn",
+              "to_msisdn",
+              "amount",
+              "reference"
+            ]
+          }
+        },
+        {
+          "name": "get_balance",
+          "description": "Get the current balance of your merchant Orange Money wallet for the configured country.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {}
+          }
+        },
+        {
+          "name": "list_supported_countries",
+          "description": "Return the list of supported Orange Money WebPay countries this server can route to (read from a static map; switch country via ORANGE_MONEY_COUNTRY env var).",
+          "inputSchema": {
+            "type": "object",
+            "properties": {}
+          }
+        },
+        {
+          "name": "validate_webhook",
+          "description": "Validate an incoming Orange Money webhook notification - checks that the order_id + pay_token + amount match a previously created webpayment by querying transactionstatus.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "order_id": {
+                "type": "string"
+              },
+              "pay_token": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "order_id",
+              "pay_token",
+              "amount"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "momo-mcp",
+      "transport": "stdio",
+      "command": "python",
+      "args": [
+        "-m",
+        "momo_mcp.server"
+      ],
+      "env": {
+        "MTN_MOMO_SUBSCRIPTION_KEY": "${MTN_MOMO_SUBSCRIPTION_KEY}"
+      },
+      "tools": [
+        {
+          "name": "request_payment",
+          "description": "Demande un paiement Mobile Money a un client (Request-to-Pay / Collection).\n\nLe client recoit une notification sur son telephone et doit confirmer avec son code PIN. Cette operation est ASYNCHRONE : le statut retourne sera 'PENDING' immediatement apres l'appel. Utilisez check_payment_status avec le reference_id retourne pour connaitre le resultat final.\n\nArgs:\n    phone_number: Numero du payeur au format MSISDN (ex: 22990000000, sans '+').\n    amount: Montant a demander, en chaine de caracteres (ex: \"1000\").\n    currency: Code devise (ex: \"XOF\", \"EUR\" en sandbox).\n    external_id: Reference interne a votre systeme (ex: numero de commande).\n    payer_message: Message affiche au payeur.\n    payee_note: Note interne liee a la transaction.\n    provider: Operateur Mobile Money a utiliser.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "phone_number": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "string"
+              },
+              "currency": {
+                "type": "string"
+              },
+              "external_id": {
+                "type": "string"
+              },
+              "payer_message": {
+                "type": "string",
+                "default": "",
+                "description": "Message affiche au payeur."
+              },
+              "payee_note": {
+                "type": "string",
+                "default": ""
+              },
+              "provider": {
+                "type": "string",
+                "default": "mtn_momo"
+              }
+            },
+            "required": [
+              "phone_number",
+              "amount",
+              "currency",
+              "external_id"
+            ]
+          }
+        },
+        {
+          "name": "check_payment_status",
+          "description": "Verifie le statut d'un paiement precedemment initie avec request_payment ou disburse_payment.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "reference_id": {
+                "type": "string"
+              },
+              "provider": {
+                "type": "string",
+                "default": "mtn_momo"
+              }
+            },
+            "required": [
+              "reference_id"
+            ]
+          }
+        },
+        {
+          "name": "disburse_payment",
+          "description": "Envoie de l'argent a un utilisateur Mobile Money (remboursement, paiement de salaire, payout). Contrairement a request_payment, aucune confirmation PIN n'est necessaire cote beneficiaire - l'argent est envoye directement.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "phone_number": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "string"
+              },
+              "currency": {
+                "type": "string"
+              },
+              "external_id": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string",
+                "default": ""
+              },
+              "provider": {
+                "type": "string",
+                "default": "mtn_momo"
+              }
+            },
+            "required": [
+              "phone_number",
+              "amount",
+              "currency",
+              "external_id"
+            ]
+          }
+        },
+        {
+          "name": "validate_account",
+          "description": "Verifie qu'un numero de telephone a un compte Mobile Money actif chez l'operateur donne, avant de lancer un paiement vers ce numero.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "phone_number": {
+                "type": "string"
+              },
+              "provider": {
+                "type": "string",
+                "default": "mtn_momo"
+              }
+            },
+            "required": [
+              "phone_number"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

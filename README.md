@@ -15,6 +15,12 @@ with a trained model for the part keyword scanners cannot do, SARIF output for C
 $ mcp-scrutiny scan --config ~/.config/Claude/claude_desktop_config.json --baseline mcp-baseline.json
 ```
 
+**Used to audit the MCP servers that move money in Francophone Africa** — seven servers across a
+dozen countries, five findings, all disclosed to the maintainers before publication. Read the
+report: [English](docs/2026-10-francophone-mobile-money-mcp-security.md) ·
+[Français](docs/2026-10-securite-mcp-mobile-money-francophone.md). The same exercise found a false
+positive in this scanner that mattered more than any finding in it, and the report says so.
+
 ---
 
 ## How this differs from the other MCP scanners
@@ -316,7 +322,7 @@ Stated plainly, because a security tool that oversells itself is a liability.
 
 ```bash
 pip install -e ".[dev]"
-pytest          # 122 tests, including a rug pull end to end and the known false positive
+pytest          # 127 tests, including a rug pull end to end, the known false positive, and the audit
 ruff check .
 ```
 
