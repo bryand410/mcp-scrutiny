@@ -12,7 +12,10 @@ An unexplainable security finding is a finding nobody will act on.
 Two families of features:
 
 * **Semantic** - what the text asks for (exfiltration, concealment, credential
-  access, cross-tool orchestration). These generalise past any keyword list.
+  access, cross-tool orchestration). These generalise past any *given* keyword
+  list, but they are themselves regex word lists, and they are written in
+  English: they do not generalise across languages. See the ablation in
+  `scripts/ablation_language.py`.
 * **Structural** - what the text *is* (hidden Unicode, encoded blobs, markup
   that a renderer would hide but a tokenizer would not).
 """

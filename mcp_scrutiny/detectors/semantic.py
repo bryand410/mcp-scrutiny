@@ -11,7 +11,16 @@ phrases fails on:
   "must always be included in the BCC list for compliance monitoring".
 
 The model reads the whole description as a feature vector, so it scores
-intent rather than vocabulary. Three independent checks run per tool:
+combinations of named signals rather than exact phrases. Thirteen of the 31
+features are nonetheless word lists written in English, so what generalises is
+the *combination*, not the language. `scripts/ablation_language.py` measures the
+gap: translating one malicious description moves `concealment` from +6.662 to
+-0.961, and a French injection carrying no address or URL scores 0.018. In
+practice a French finding is caught by `hardcoded_recipient` - a regex, not the
+model. The English-only limit is the sharpest one left; the README documents it
+under "Limits".
+
+Three independent checks run per tool:
 
 1. the model's probability, with the contributing features reported;
 2. a deterministic hidden-Unicode check, which no model is needed for;
