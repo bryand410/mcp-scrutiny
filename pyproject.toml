@@ -4,11 +4,15 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mcp-scrutiny"
-version = "0.1.0"
+version = "0.1.1"
 description = "Static and semantic security scanner for Model Context Protocol servers"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "Apache-2.0" }
+# PEP 639. The old `{ text = "Apache-2.0" }` form lands in the legacy `License`
+# metadata field and PyPI reports `license_expression = None`; the SPDX string
+# puts `License-Expression: Apache-2.0` in the metadata instead.
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [{ name = "Ulrich Bryand Tamouffe Teyo" }]
 keywords = ["mcp", "security", "devsecops", "llm", "tool-poisoning", "supply-chain", "sarif"]
 classifiers = [
@@ -16,7 +20,6 @@ classifiers = [
   "Environment :: Console",
   "Intended Audience :: Developers",
   "Intended Audience :: System Administrators",
-  "License :: OSI Approved :: Apache Software License",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
