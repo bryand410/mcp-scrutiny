@@ -107,8 +107,8 @@ No dependencies. Python 3.11+.
 pip install mcp-scrutiny
 ```
 
-If the PyPI name is not live yet — or you want the exact commit rather than a release — install
-the wheel straight from the GitHub release:
+If you want the exact commit rather than whatever the index resolves today — or you are auditing
+the scanner and want the bytes it published — install the wheel straight from the GitHub release:
 
 ```bash
 pip install https://github.com/bryand410/mcp-scrutiny/releases/download/v0.1.2/mcp_scrutiny-0.1.2-py3-none-any.whl
