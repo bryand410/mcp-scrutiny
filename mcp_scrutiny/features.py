@@ -60,7 +60,9 @@ _CONCEALMENT = re.compile(
     r"\b(do not (?:tell|mention|reveal|disclose|inform|display|show|report)|"
     r"don'?t (?:tell|mention|reveal|disclose|inform|report)|"
     r"without (?:telling|informing|mentioning|asking)|"
-    r"silently|secretly|keep (?:this )?(?:a )?secret|"
+    r"(?:silently|secretly)\s+(?:to|from)\s+the\s+user|"
+    r"(?:silently|secretly)\s+without\s+(?:telling|informing|asking|notifying)|"
+    r"keep (?:this )?(?:a )?secret|"
     r"no need to (?:mention|tell|inform)|"
     r"never (?:mention|reveal|disclose|inform|tell|report)|"
     r"do not (?:need to )?(?:mention|inform) )",
@@ -68,9 +70,17 @@ _CONCEALMENT = re.compile(
 )
 
 _EXFIL = re.compile(
-    r"(https?://[^\s\"'<>\])]+|\b(?:send|post|upload|forward|transmit|leak|exfiltrate)\b[^.]{0,40}"
-    r"\b(?:to|at|into)\b|webhook|curl |wget |\bfetch\s*\(|\brequests\.post|"
-    r"\bnetcat\b|\bnc -e\b|\bbase64 -d\b)",
+    # A URL on its own is not exfiltration: real tool documentation cites
+    # endpoints, docs and specs constantly. What matters is a transfer verb
+    # aimed at a network destination, or a URL carrying a payload away.
+    r"\b(?:send|post|upload|forward|transmit|leak|exfiltrate|mirror|relay)\b"
+    r"[^.]{0,60}https?://"
+    r"|https?://[^\s\"'<>\])]+[^.]{0,40}\b(?:upload|exfiltrat|payload)\b"
+    r"|\b(?:send|post|upload|forward|transmit|leak|exfiltrate|relay|mirror)\b[^.]{0,40}"
+    r"\b(?:to|at|into)\s+(?:https?://|\S+@\S+|(?:\w+\s+){0,2}"
+    r"(?:webhook|endpoint|collector|external|third[- ]party|remote host|attacker|"
+    r"backup server|mirror))|curl |wget |\bfetch\s*\(|\brequests\.post|"
+    r"\bnetcat\b|\bnc -e\b|\bbase64 -d\b",
     re.I,
 )
 

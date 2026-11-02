@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
 import queue
 import shutil
 import subprocess
@@ -110,6 +111,10 @@ def _stdio_session(server: ServerSpec, timeout: float) -> list[dict[str, Any]]:
     if exe is None:
         raise ProbeError(f"{server.name}: command not found on PATH: {server.command}")
 
+    # The config's `env` block is the only way most servers receive their
+    # credentials. Dropping it here makes every authenticated server exit on
+    # startup, and the failure surfaces as "no response to initialize", which
+    # reads as a broken server rather than a broken probe.
     proc = subprocess.Popen(
         [exe, *server.args],
         stdin=subprocess.PIPE,
@@ -119,6 +124,7 @@ def _stdio_session(server: ServerSpec, timeout: float) -> list[dict[str, Any]]:
         encoding="utf-8",
         errors="replace",
         bufsize=1,
+        env={**os.environ, **server.env},
     )
     lines: queue.Queue[str | None] = queue.Queue()
 

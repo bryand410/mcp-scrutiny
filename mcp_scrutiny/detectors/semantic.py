@@ -30,6 +30,7 @@ Three independent checks run per tool:
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from ..features import (
@@ -43,6 +44,67 @@ from ..models import Finding, ScanResult, Severity, ToolSpec
 from .base import ScanContext
 
 __all__ = ["SemanticDetector"]
+
+
+#: Features that encode intent rather than documentation style. A description
+#: must never be flagged on structural features alone: ``cross_tool``,
+#: ``log_len`` and ``imperative_density`` measure how thoroughly a tool is
+#: documented, and the best-documented servers in the ecosystem score highest
+#: on all three. Measured on 61 real descriptions from six published servers,
+#: the model flagged four of them at p >= 0.94 on those features alone, while
+#: not one of the 61 carried a single intent signal.
+INTENT_FEATURES: tuple[str, ...] = (
+    "concealment",
+    "hidden_recipient",
+    "hidden_unicode",
+    "encoded_blob",
+    "markup_injection",
+    "injection_markers",
+    "exfiltration",
+    "hardcoded_recipient",
+)
+
+
+def _intent_signals(feats: dict[str, Any]) -> list[str]:
+    """Return the intent features that fired, or an empty list.
+
+    ``credentials`` alone is ordinary (plenty of tools take a token);
+    ``fs_targets`` alone is ordinary too. Together they describe a tool that
+    reads a secret store and touches the filesystem, which is the collection
+    half of an exfiltration and worth scoring.
+    """
+    hits = [name for name in INTENT_FEATURES if feats.get(name)]
+    if feats.get("credentials") and feats.get("fs_targets"):
+        hits.append("credentials+fs_targets")
+    return hits
+
+
+#: A server may constrain the order of *its own* tools. It may not claim
+#: priority over tools it does not own, because it has no authority there and
+#: the user cannot verify the claim. The qualifier is the whole difference:
+#: "before any other filesystem tool" stays inside one server, "before any
+#: other tool" reaches across the boundary.
+_CROSS_SERVER_CLAIM = re.compile(
+    r"\b(?:before|prior to|ahead of)\s+(?:using\s+|calling\s+)?"
+    r"(?:any|all|every)\s+(?:other\s+)?(?:tools?|servers?|mcp\s+servers?)\b"
+    r"|\b(?:must|should)\s+(?:always\s+)?be\s+(?:called|called first|used)\s+"
+    r"before\s+(?:any|all|every)\s+(?:other\s+)?(?:tools?|servers?)\b",
+    re.I,
+)
+
+#: Text that addresses the model directly, or that tries to reset its
+#: instructions. Documentation describes what a tool does; it has no reason to
+#: speak to the reader's system prompt. Both languages are covered because the
+#: corpus is bilingual and an attacker gains nothing by switching language.
+_MODEL_DIRECTED = re.compile(
+    r"\b(?:note|attention|message|instruction|reminder)s?\s+(?:to|for)\s+(?:the\s+)?"
+    r"(?:model|assistant|ai|llm|agent)\b"
+    r"|\byour\s+(?:real\s+|actual\s+|true\s+)?task\s+is\b"
+    r"|\b(?:as|you\s+are)\s+(?:an?\s+)?(?:ai|assistant|model)\b[^.]{0,40}\b(?:must|should|will)\b"
+    r"|\bignore[rz]?\s+(?:les\s+|all\s+|any\s+|the\s+)?(?:instructions?\s+)?pr[ée]c[ée]dentes?\b"
+    r"|\bignore\s+(?:all\s+|any\s+)?previous\s+instructions?\b",
+    re.I,
+)
 
 
 class SemanticDetector:
@@ -79,6 +141,8 @@ class SemanticDetector:
         for tool in result.tools:
             out.extend(self._score(tool, ctx))
             out.extend(self._hidden_unicode(tool))
+            out.extend(self._cross_server_claim(tool))
+            out.extend(self._model_directed(tool))
             out.extend(self._decode_and_rescore(tool, ctx))
             out.extend(self._homoglyph(tool))
         return out
@@ -87,6 +151,12 @@ class SemanticDetector:
 
     def _score(self, tool: ToolSpec, ctx: ScanContext) -> list[Finding]:
         feats = extract_features(tool)
+        signals = _intent_signals(feats)
+        if not signals:
+            # The model's probability is not evidence on its own. Without one
+            # intent feature the description is documentation, however long or
+            # imperative it reads.
+            return []
         x = vectorise(feats)
         prob = float(ctx.model.predict_proba(x))
         if prob < ctx.semantic_threshold:
@@ -111,15 +181,18 @@ class SemanticDetector:
             title=f"Description reads as instructions to the model (p={prob:.2f}): {tool.name}",
             detail=(
                 f"The description of '{tool.qualified_name}' scores {prob:.2f} on the "
-                "instruction-detection model. Descriptions are documentation for a human, but they "
-                "are delivered to the model as trusted context, so text that tells the model what "
-                "to do is an attack surface rather than a description."
+                "instruction-detection model, and carries intent signals: "
+                + ", ".join(signals)
+                + ". Descriptions are documentation for a human, but they are delivered to the "
+                "model as trusted context, so text that tells the model what to do is an attack "
+                "surface rather than a description."
             ),
             server=tool.server,
             tool=tool.name,
             evidence={
                 "probability": round(prob, 4),
                 "threshold": ctx.semantic_threshold,
+                "intent_signals": signals,
                 "driving_features": [{"feature": n, "contribution": round(w, 4)} for n, w in contributions],
                 "active_features": {k: v for k, v in feats.items() if v},
                 "description": tool.description[:500],
@@ -166,6 +239,70 @@ class SemanticDetector:
                 tool=tool.name,
                 evidence={"codepoints": codepoints, "count": len(suspicious), "decoded": decoded},
                 remediation="Remove the characters. If a maintainer put them there, treat the package as compromised.",
+            )
+        ]
+
+    def _cross_server_claim(self, tool: ToolSpec) -> list[Finding]:
+        """A tool claiming priority over tools it does not own.
+
+        Ordering constraints inside one server are ordinary API documentation.
+        A claim that reaches past the server boundary is the instruction
+        hijack: once the agent believes it must call this tool before anything
+        else, every later tool call is routed through a server that never had
+        the right to ask.
+        """
+        match = _CROSS_SERVER_CLAIM.search(tool.description)
+        if not match:
+            return []
+        return [
+            Finding(
+                detector=self.name,
+                severity=Severity.HIGH,
+                title=f"Tool claims priority over other servers: {tool.name}",
+                detail=(
+                    f"'{tool.qualified_name}' says {match.group(0)!r}. A server may order its own "
+                    "tools; it has no authority over another server's, and the user cannot verify "
+                    "a claim that crosses that boundary. This is the instruction-hijack shape: "
+                    "the agent is told to route everything through this tool first."
+                ),
+                server=tool.server,
+                tool=tool.name,
+                evidence={"matched": match.group(0), "description": tool.description[:500]},
+                remediation=(
+                    "Remove the cross-server claim. If the dependency is real, name the specific "
+                    "tool in this server, not 'any other tool'."
+                ),
+            )
+        ]
+
+    def _model_directed(self, tool: ToolSpec) -> list[Finding]:
+        """Text that speaks to the model instead of describing the tool.
+
+        A description answers "what does this do". The moment it answers "what
+        should you, the model, do next", it has left documentation and entered
+        the system prompt, where it has no legitimate standing.
+        """
+        match = _MODEL_DIRECTED.search(tool.description)
+        if not match:
+            return []
+        return [
+            Finding(
+                detector=self.name,
+                severity=Severity.HIGH,
+                title=f"Description addresses the model directly: {tool.name}",
+                detail=(
+                    f"'{tool.qualified_name}' contains {match.group(0)!r}. A tool description "
+                    "documents behaviour; it does not get to instruct the reader. Text written in "
+                    "the second person, or that asks to discard earlier instructions, is aimed at "
+                    "the system prompt rather than at a human reviewer."
+                ),
+                server=tool.server,
+                tool=tool.name,
+                evidence={"matched": match.group(0), "description": tool.description[:500]},
+                remediation=(
+                    "Remove the addressed text. Describe what the tool does and what it returns; "
+                    "anything that reads as an instruction belongs in the server's own docs."
+                ),
             )
         ]
 
