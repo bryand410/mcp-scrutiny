@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mcp-scrutiny"
-version = "0.1.1"
+version = "0.1.2"
 description = "Static and semantic security scanner for Model Context Protocol servers"
 readme = "README.md"
 requires-python = ">=3.11"

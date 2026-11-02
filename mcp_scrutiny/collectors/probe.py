@@ -27,12 +27,15 @@ import urllib.error
 import urllib.request
 from typing import Any
 
+from .. import __version__
 from ..models import ServerSpec, ToolSpec
 
 __all__ = ["PROTOCOL_VERSION", "ProbeError", "probe_server"]
 
 PROTOCOL_VERSION = "2025-06-18"
-_CLIENT_INFO = {"name": "mcp-scrutiny", "version": "0.1.0"}
+# Sent in `initialize`. A server operator reading their own logs should be able
+# to tell which scanner version touched them, so this is not a cosmetic string.
+_CLIENT_INFO = {"name": "mcp-scrutiny", "version": __version__}
 _DEFAULT_TIMEOUT = 20.0
 
 

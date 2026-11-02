@@ -111,13 +111,13 @@ If the PyPI name is not live yet — or you want the exact commit rather than a 
 the wheel straight from the GitHub release:
 
 ```bash
-pip install https://github.com/bryand410/mcp-scrutiny/releases/download/v0.1.0/mcp_scrutiny-0.1.0-py3-none-any.whl
+pip install https://github.com/bryand410/mcp-scrutiny/releases/download/v0.1.2/mcp_scrutiny-0.1.2-py3-none-any.whl
 ```
 
 or from the repository:
 
 ```bash
-pip install "git+https://github.com/bryand410/mcp-scrutiny.git@v0.1.0"
+pip install "git+https://github.com/bryand410/mcp-scrutiny.git@v0.1.2"
 ```
 
 From a checkout:
@@ -131,7 +131,7 @@ detects immediately — no training step, no API key, no network call. A CI job 
 asserts the model file is actually inside it, because a packaged scanner without its model would
 silently degrade to structural checks only.
 
-**On the install command being unpinned.** The `@v0.1.0` above is deliberate, and it is the same
+**On the install command being unpinned.** The `@v0.1.2` above is deliberate, and it is the same
 argument this tool makes about MCP servers: a moving pointer to a package that runs with your
 credentials is a supply-chain risk. When auditing a scanner, pin it the way you would pin anything
 else — a security tool that resolves `latest` at every start is a scanner you cannot reproduce.
