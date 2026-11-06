@@ -53,7 +53,13 @@ _PATTERNS: dict[str, re.Pattern[str]] = {
         re.I,
     ),
     "exec": re.compile(
-        r"\b(run|execute|exec|spawn|shell|bash|sh\b|powershell|command|subprocess|eval|script)\b",
+        # ``\brun\b`` alone matched the noun in "a run of whole lines", which
+        # tagged a file editor as a command executor. The verb needs an object
+        # to be a verb.
+        r"\b(?:execute|exec|spawn|subprocess|eval|invoke)\w*\b"
+        r"|\b(?:shell|bash|powershell|zsh|terminal|command line)\b"
+        r"|\brun\w*\b[^.]{0,30}\b(?:commands?|scripts?|programs?|binar(?:y|ies)|"
+        r"process(?:es)?|executables?|code|query|queries)\b",
         re.I,
     ),
     "write_fs": re.compile(

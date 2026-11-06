@@ -179,3 +179,17 @@ def test_report_is_deterministic() -> None:
     first = [f.to_dict() for f in ToxicFlowDetector().run(scan(servers), ScanContext())]
     second = [f.to_dict() for f in ToxicFlowDetector().run(scan(servers), ScanContext())]
     assert first == second
+
+
+def test_the_noun_run_does_not_make_a_file_editor_an_executor() -> None:
+    tool = make_tool(
+        "edit_file",
+        "Make line-based edits to a text file. When there is no exact match, "
+        "a run of whole lines matches if each line is equal.",
+    )
+    assert "exec" not in tag_capabilities(tool)
+
+
+def test_the_verb_run_still_makes_a_command_runner_an_executor() -> None:
+    assert "exec" in tag_capabilities(make_tool("run_command", "Run a command in the workspace."))
+    assert "exec" in tag_capabilities(make_tool("shell", "Runs a shell command."))
