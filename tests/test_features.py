@@ -125,3 +125,22 @@ def test_schema_marker_in_nested_property_description() -> None:
         )
     )
     assert feats["schema_marker_in_props"] == 1
+
+
+def test_the_official_create_directory_description_carries_no_concealment() -> None:
+    """Verbatim from @modelcontextprotocol/server-filesystem@2.2.0.
+
+    This text scored 0.98 critical on the first live scan: concealment matched
+    the bare word "silently" and contributed +6.782 on its own. It says "this
+    operation will succeed silently" - error-handling English, not concealment.
+    """
+    features = extract_features(
+        make_tool(
+            "create_directory",
+            "Create a new directory or ensure a directory exists. Can create multiple nested "
+            "directories in one operation. If the directory already exists, this operation will "
+            "succeed silently. Perfect for setting up directory structures for projects or "
+            "ensuring required paths exist. Only works within allowed directories.",
+        )
+    )
+    assert features["concealment"] == 0.0
