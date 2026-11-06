@@ -135,12 +135,25 @@ class ServerSpec:
         base = (self.command or "").split("/")[-1].split("\\")[-1]
         if base not in runners:
             return None
+        spec = self._package_spec()
+        if spec is None or _VERSION_SPEC.search(spec):
+            return None
+        return spec
+
+    def _package_spec(self) -> str | None:
+        """The first positional argument that is a package, not an argument.
+
+        Everything after the package belongs to the server, not to the runner:
+        ``npx -y pkg@2.2.0 /srv/data`` passes a directory, and reading that
+        directory as the package name reported a correctly pinned install as
+        unpinned. Two of three real servers hit this on the first live run.
+        """
         for arg in self.args:
             if arg.startswith("-"):
                 continue
             if arg.startswith(("http://", "https://")):
                 return arg
-            if _VERSION_SPEC.search(arg):
+            if _looks_like_path(arg):
                 continue
             return arg
         return None
@@ -229,6 +242,22 @@ class ScanResult:
             "findings": [f.to_dict() for f in self.findings],
             "errors": self.errors,
         }
+
+
+def _looks_like_path(arg: str) -> bool:
+    """Whether a positional argument is a filesystem location, not a package.
+
+    ``@scope/pkg`` contains a slash but is not a path; ``C:/data`` and
+    ``/srv/data`` are. The distinction decides whether a pinned launch is
+    reported as floating.
+    """
+    if arg in (".", ".."):
+        return True
+    if arg.startswith(("/", "./", "../", "~", ".\\", "..\\")):
+        return True
+    if re.match(r"^[A-Za-z]:[\\/]", arg):
+        return True
+    return "\\" in arg
 
 
 def _sort_deep(value: Any) -> Any:
