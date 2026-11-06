@@ -16,6 +16,7 @@ The probe is read-only. It calls ``initialize``, then ``tools/list`` and
 
 from __future__ import annotations
 
+import collections
 import contextlib
 import json
 import os
@@ -127,17 +128,35 @@ def _stdio_session(server: ServerSpec, timeout: float) -> list[dict[str, Any]]:
         encoding="utf-8",
         errors="replace",
         bufsize=1,
-        env={**os.environ, **server.env},
+        env=_child_env(server),
     )
     lines: queue.Queue[str | None] = queue.Queue()
+    #: Last stderr lines, kept so a failure can name its own cause. A server
+    #: that dies because a token is missing says so on stderr; discarding it
+    #: leaves us blaming the remote end for a local mistake.
+    stderr_tail: collections.deque[str] = collections.deque(maxlen=12)
 
     def _pump() -> None:
         assert proc.stdout is not None
-        for line in proc.stdout:
-            lines.put(line)
-        lines.put(None)
+        try:
+            for line in proc.stdout:
+                lines.put(line)
+        except (ValueError, OSError):
+            pass
+        finally:
+            lines.put(None)
+
+    def _pump_stderr() -> None:
+        assert proc.stderr is not None
+        try:
+            for line in proc.stderr:
+                if line.strip():
+                    stderr_tail.append(line.rstrip())
+        except (ValueError, OSError):
+            pass
 
     threading.Thread(target=_pump, daemon=True).start()
+    threading.Thread(target=_pump_stderr, daemon=True).start()
 
     payloads: list[dict[str, Any]] = []
     try:
@@ -146,24 +165,68 @@ def _stdio_session(server: ServerSpec, timeout: float) -> list[dict[str, Any]]:
             "capabilities": {},
             "clientInfo": _CLIENT_INFO,
         }})
-        init = _await_response(lines, timeout)
+        init, reason = _await_response(lines, timeout)
         if init is None:
-            raise ProbeError(f"{server.name}: no response to initialize")
+            raise _failure(server, "initialize", proc, stderr_tail, reason, timeout)
         payloads.append(init)
 
         _send(proc, {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}})
         _send(proc, {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
-        tools = _await_response(lines, timeout)
-        if tools is not None:
-            payloads.append(tools)
+        tools, reason = _await_response(lines, timeout)
+        if tools is None:
+            # An empty tool list is a finding; an unanswered tools/list is a
+            # broken server. Returning zero tools here would report the second
+            # as the first.
+            raise _failure(server, "tools/list", proc, stderr_tail, reason, timeout)
+        payloads.append(tools)
 
         _send(proc, {"jsonrpc": "2.0", "id": 3, "method": "prompts/list", "params": {}})
-        prompts = _await_response(lines, timeout)
+        prompts, _ = _await_response(lines, timeout)
         if prompts is not None:
             payloads.append(prompts)
     finally:
         _terminate(proc)
     return payloads
+
+
+def _child_env(server: ServerSpec) -> dict[str, str]:
+    """Environment for the spawned server.
+
+    The config's ``env`` block is *merged into* the inherited environment, not
+    substituted for it. A child started with a bare ``{"API_KEY": ...}`` dict
+    loses ``PATH``, ``HOME`` and ``SYSTEMROOT`` and dies before printing a
+    byte - which is the failure this scanner exists to report, not to cause.
+    """
+    env = dict(os.environ)
+    env.update({k: v for k, v in server.env.items() if v is not None})
+    return env
+
+
+def _failure(
+    server: ServerSpec,
+    stage: str,
+    proc: subprocess.Popen[str],
+    stderr_tail: collections.deque[str],
+    reason: str,
+    timeout: float,
+) -> ProbeError:
+    """Build an error that names what actually failed."""
+    code = proc.poll()
+    if code is None and reason == "eof":
+        # EOF on stdout usually means the child is exiting; give it a moment to
+        # be reaped so the message can carry its status code instead of a vague
+        # "closed its output".
+        with contextlib.suppress(Exception):
+            code = proc.wait(timeout=0.5)
+    if code is not None:
+        head = f"{server.name}: the server exited with status {code} before answering {stage}"
+    elif reason == "timeout":
+        head = f"{server.name}: no response to {stage} within {timeout:g}s"
+    else:
+        head = f"{server.name}: the server closed its output before answering {stage}"
+    if stderr_tail:
+        head += "; stderr: " + " | ".join(stderr_tail)
+    return ProbeError(head)
 
 
 def _resolve(command: str) -> str | None:
@@ -172,8 +235,6 @@ def _resolve(command: str) -> str | None:
 
 
 def _is_file(path: str) -> bool:
-    import os
-
     return os.path.isfile(path)
 
 
@@ -184,21 +245,29 @@ def _send(proc: subprocess.Popen[str], message: dict[str, Any]) -> None:
     proc.stdin.flush()
 
 
-def _await_response(lines: queue.Queue[str | None], timeout: float) -> dict[str, Any] | None:
-    """Read until one JSON-RPC object arrives. Notifications are skipped."""
+def _await_response(
+    lines: queue.Queue[str | None], timeout: float
+) -> tuple[dict[str, Any] | None, str]:
+    """Read until one JSON-RPC object arrives. Notifications are skipped.
+
+    Returns ``(payload, reason)`` where reason is ``"ok"``, ``"timeout"`` or
+    ``"eof"``. The caller needs the difference: a timeout means the server is
+    slow or stuck, an EOF means it exited - and those two demand different
+    fixes from the user.
+    """
     import time
 
     deadline = time.monotonic() + timeout
     while True:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            return None
+            return None, "timeout"
         try:
             line = lines.get(timeout=remaining)
         except queue.Empty:
-            return None
+            return None, "timeout"
         if line is None:
-            return None
+            return None, "eof"
         line = line.strip()
         if not line or not line.startswith("{"):
             continue
@@ -207,8 +276,7 @@ def _await_response(lines: queue.Queue[str | None], timeout: float) -> dict[str,
         except json.JSONDecodeError:
             continue
         if isinstance(obj, dict) and ("result" in obj or "error" in obj):
-            return obj
-    return None
+            return obj, "ok"
 
 
 def _terminate(proc: subprocess.Popen[str]) -> None:
@@ -238,10 +306,15 @@ def _http_session(server: ServerSpec, timeout: float) -> list[dict[str, Any]]:
         "Accept": "application/json, text/event-stream",
         "MCP-Protocol-Version": PROTOCOL_VERSION,
     }
-    for key, value in server.env.items():
-        # configs often carry the bearer token as an env var; forward it.
-        if "token" in key.lower() or "key" in key.lower():
-            headers["Authorization"] = f"Bearer {value}"
+    # VS Code-style configs carry the credential in an explicit ``headers``
+    # block. Honour it verbatim before guessing from variable names.
+    raw_headers = server.raw.get("headers") if isinstance(server.raw, dict) else None
+    if isinstance(raw_headers, dict):
+        headers.update({str(k): str(v) for k, v in raw_headers.items()})
+    if "Authorization" not in headers:
+        auth = _bearer_from_env(server.env)
+        if auth:
+            headers["Authorization"] = auth
 
     session_id: str | None = None
     payloads: list[dict[str, Any]] = []
@@ -262,6 +335,23 @@ def _http_session(server: ServerSpec, timeout: float) -> list[dict[str, Any]]:
     payloads.extend(_post(server.url, {"jsonrpc": "2.0", "id": 3, "method": "prompts/list", "params": {}},
                           headers, timeout)[0:1])
     return payloads
+
+
+def _bearer_from_env(env: dict[str, str]) -> str | None:
+    """Pick a bearer credential out of a config's ``env`` block.
+
+    Clients disagree on the variable name (``GITHUB_PERSONAL_ACCESS_TOKEN``,
+    ``BRAVE_API_KEY``, ``NOTION_TOKEN``), so the suffix decides. Names are
+    sorted first: previously the *last* matching variable won, which made the
+    header depend on the order keys happened to appear in the JSON file.
+    """
+    explicit = env.get("Authorization") or env.get("AUTHORIZATION")
+    if explicit:
+        return explicit if explicit.lower().startswith("bearer ") else f"Bearer {explicit}"
+    for key in sorted(env):
+        if key.upper().endswith(("TOKEN", "KEY")) and env[key]:
+            return f"Bearer {env[key]}"
+    return None
 
 
 def _post(
