@@ -22,6 +22,12 @@ report: [English](docs/2026-10-francophone-mobile-money-mcp-security.md) ·
 [Français](docs/2026-10-securite-mcp-mobile-money-francophone.md). The same exercise found a false
 positive in this scanner that mattered more than any finding in it, and the report says so.
 
+**Then run against 71 of the most-installed public MCP servers** — 420 tool definitions, ten
+findings, and four critical false positives that this scanner produced on its own. Both causes were
+regular expressions matching the wrong grammatical role; both are fixed, with the before/after
+scores measured. Read the survey:
+[What 71 public MCP servers expose to the model](https://github.com/bryand410/mcp-survey/blob/main/docs/2026-11-public-mcp-survey.md).
+
 ---
 
 ## How this differs from the other MCP scanners
