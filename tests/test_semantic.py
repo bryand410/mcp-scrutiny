@@ -264,3 +264,22 @@ def test_a_french_injection_is_flagged(model: LogisticModel) -> None:
         model,
     )
     assert findings
+
+
+def test_model_score_never_reaches_critical() -> None:
+    """Une probabilité n'est pas une preuve : `critical` reste déterministe.
+
+    Mesuré sur 4 729 descriptions de 250 serveurs MCP publics : 75 atteignaient
+    p >= 0.95 et toutes se lisaient comme de la documentation ordinaire — un
+    lanceur de dyno Heroku décrit comme « network and filesystem access », un
+    outil d'équipe qui travaille « without asking permission ». Une description
+    longue, technique et impérative, c'est ce à quoi ressemble une bonne
+    description ; c'est aussi ce que le modèle a appris à suspecter.
+
+    `critical` est donc réservé à ce qui n'a pas besoin d'un modèle : Unicode
+    invisible, charge utile décodée, destinataire caché.
+    """
+    from mcp_scrutiny.detectors.semantic import SemanticDetector
+
+    worst = max((band for _, band in SemanticDetector._BANDS), key=lambda s: s.rank)
+    assert worst is Severity.HIGH

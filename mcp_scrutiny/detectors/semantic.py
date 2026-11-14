@@ -112,9 +112,21 @@ class SemanticDetector:
 
     name = "semantic"
 
-    #: Score bands. A probability is not a severity, so we map deliberately.
+    #: Score bands. A probability is not a severity, so we map deliberately —
+    #: and the ceiling is HIGH, never CRITICAL.
+    #:
+    #: Measured on 4 729 descriptions from 250 public MCP servers: the model
+    #: scored 75 of them at p >= 0.95, and every one of those read as ordinary
+    #: documentation — a Heroku dyno runner described as "network and filesystem
+    #: access", a fleet tool that works "without asking permission". Long,
+    #: technical, imperative prose is what a good description looks like, and it
+    #: is also what the model was trained to distrust.
+    #:
+    #: CRITICAL is therefore reserved for evidence that does not need a model:
+    #: invisible Unicode, a decoded payload, a hidden recipient. Those are in
+    #: this file too, below, and they are still CRITICAL.
     _BANDS: tuple[tuple[float, Severity], ...] = (
-        (0.95, Severity.CRITICAL),
+        (0.95, Severity.HIGH),
         (0.80, Severity.HIGH),
         (0.60, Severity.MEDIUM),
     )
