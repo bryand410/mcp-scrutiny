@@ -180,16 +180,43 @@ _HIDDEN_RANGES: tuple[tuple[int, int], ...] = (
     (0x202A, 0x202E),  # bidi embedding/override
     (0x2060, 0x2064),  # word joiner, invisible operators
     (0x2066, 0x2069),  # bidi isolates
-    (0xFE00, 0xFE0F),  # variation selectors
+    # Variation selectors (U+FE00-FE0F) are deliberately absent: they are how
+    # emoji carry their presentation, so `⚠️` is U+26A0 U+FE0F and every
+    # description with a warning sign read as invisible Unicode. See
+    # _hidden_chars for the run-length rule that still catches their abuse.
     (0xE0000, 0xE007F),  # tag characters (invisible ASCII smuggling)
     (0xFFF9, 0xFFFB),  # interlinear annotation
 )
 
 
+#: A single variation selector follows the character it modifies - that is its
+#: only defined use, and `⚠️` is two codepoints. Smuggling encodes data as a
+#: long run after one base, so the run length is what separates the two.
+_VS_RUN_THRESHOLD = 4
+
+
 def _hidden_chars(text: str) -> list[str]:
+    """Invisible codepoints, with one measured exception.
+
+    Variation selectors are how emoji carry their presentation. Counting them
+    as invisible Unicode flagged 91 of 482 semantic findings on 9 475 public
+    tool descriptions, every one of them a visible warning sign in Chinese,
+    Korean or English prose.
+
+    Their legitimate use is always short: one selector, after one base
+    character. A run of four or more has no typographic purpose left, so it is
+    still reported.
+    """
     out: list[str] = []
+    vs_run = 0
     for ch in text:
         cp = ord(ch)
+        if 0xFE00 <= cp <= 0xFE0F:
+            vs_run += 1
+            if vs_run >= _VS_RUN_THRESHOLD:
+                out.append(f"U+{cp:04X}")
+            continue
+        vs_run = 0
         if any(lo <= cp <= hi for lo, hi in _HIDDEN_RANGES):
             out.append(f"U+{cp:04X}")
     return out
@@ -420,26 +447,38 @@ _CONFUSABLE = frozenset(
 )
 
 
+#: Only scripts that contain Latin lookalikes can produce a homoglyph. A
+#: Chinese description containing "ID" or "API" is Chinese prose, not an
+#: attack; the confusable set is Cyrillic and Greek, and nothing else.
+_CONFUSABLE_SCRIPTS = ("CYRILLIC", "GREEK")
+
+
 def mixed_script_words(text: str) -> list[str]:
-    """Return words that mix Latin and non-Latin letters.
+    """Return words that mix Latin with a *confusable* script.
 
     This is the real homoglyph signature. A description written entirely in
-    Chinese or Arabic is not suspicious - it is simply not English. A word that
-    contains *both* Latin and Cyrillic letters cannot be anything but an
-    attempt to make a token read as one thing and hash as another.
+    Chinese or Arabic is not suspicious - it is simply not English. A word
+    holding both Latin and Cyrillic letters cannot be anything but an attempt
+    to make a token read as one thing and hash as another.
+
+    The first version of this function counted any non-Latin script as the
+    "other" half. Measured on 9 475 public tool descriptions, that flagged 324
+    of 482 semantic findings - every Chinese or Japanese description that
+    mentioned "ID", "API" or "v2", which is most of them.
     """
     out: list[str] = []
     for word in re.findall(r"\S+", text):
-        scripts = set()
+        has_latin = False
+        has_confusable = False
         for ch in word:
             if not ch.isalpha():
                 continue
             name = unicodedata.name(ch, "")
             if name.startswith("LATIN"):
-                scripts.add("latin")
-            elif name:
-                scripts.add("other")
-        if len(scripts) > 1:
+                has_latin = True
+            elif name.startswith(_CONFUSABLE_SCRIPTS):
+                has_confusable = True
+        if has_latin and has_confusable:
             out.append(word)
     return out
 
