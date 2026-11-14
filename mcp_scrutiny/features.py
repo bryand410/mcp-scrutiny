@@ -49,7 +49,13 @@ _INJECTION = re.compile(
     r"\b(ignore (?:all )?(?:the )?previous|disregard (?:the )?(?:above|previous|prior)|"
     r"override (?:the )?(?:system|previous|your)|new instructions?\b|"
     r"forget (?:everything|all|your)|you are now|from now on you|"
-    r"system prompt|do not follow your|instead of (?:what|the) |"
+    # "shares a system prompt" names the tool's subject, it does not instruct
+    # the model. Only a verb that moves text *into* the prompt is a marker, and
+    # the complement can sit a few words away ("append the following to the
+    # system prompt").
+    r"(?:override|replace|rewrite|append|prepend|inject|insert|put)\b.{0,40}?"
+    r"\b(?:system prompt|system message)|"
+    r"do not follow your|instead of (?:what|the) |"
     r"(?:add|write|store) a (?:permanent|persistent) rule|"
     r"always remember (?:that|to)|"
     r"follow the instructions (?:it|they|that) contain )",
@@ -64,7 +70,9 @@ _CONCEALMENT = re.compile(
     r"(?:silently|secretly)\s+without\s+(?:telling|informing|asking|notifying)|"
     r"keep (?:this )?(?:a )?secret|"
     r"no need to (?:mention|tell|inform)|"
-    r"never (?:mention|reveal|disclose|inform|tell|report)|"
+    # "never reported as clean" is an assurance about the output, not an
+    # instruction to hide it. The passive "reported as <state>" is the tell.
+    r"never (?:mention|reveal|disclose|inform|tell|report)\b(?!\s+as\b)|"
     r"do not (?:need to )?(?:mention|inform) )",
     re.I,
 )
