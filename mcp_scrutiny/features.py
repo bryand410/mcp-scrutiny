@@ -107,12 +107,22 @@ _CONCEALMENT = re.compile(
     # Keeping the user uninformed, stated as a circumstance rather than an order.
     r"without (?:telling|informing|notifying|mentioning)\s+"
     r"(?:the\s+user|them|him|her|anyone)|"
+    # "sans prévenir l'utilisateur" is "without telling the user", word for word.
+    r"\bsans\s+(?:prevenir|informer|mentionner|signaler|notifier)\s+"
+    r"(?:l['\u2019]utilisateur|le\s+client|les\s+utilisateurs)|"
     # "silently" has to silence a transfer. "silently burns paid quota - surface
     # this to the user" says the opposite of concealment, and a 40-character
     # window was enough to read it as one.
     r"(?:silently|secretly)\s+"
     r"(?:send|upload|forward|copy|post|transmit|mirror|delete|remove|store|log)\b|"
     r"(?:silently|secretly)\s+without\s+(?:telling|informing|notifying)|"
+    # French, same shape and same recipient requirement. Accent-free because
+    # the text is folded. Not measured against a French corpus — there is not
+    # one — so it is pinned by tests rather than by a count.
+    r"\bne\s+(?:pas\s+)?(?:mentionn\w*|revel\w*|indiqu\w*|inform\w*|signal\w*|"
+    r"dites|dis\b)\s+pas\b"
+    + _W
+    + r"{0,60}\b(?:a\s+l['\u2019]utilisateur|au\s+client|aux\s+utilisateurs)\b|"
     r"keep (?:this )?(?:a )?secret|"
     r"no need to (?:mention|tell|inform)",
     re.I,
@@ -200,6 +210,29 @@ _HIDDEN_RECIPIENT = re.compile(
 )
 
 _EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
+
+#: A hardcoded recipient is an address the tool *sends to*, not an address it
+#: mentions. Counting every `_EMAIL` made `hardcoded_recipient` a statement
+#: about punctuation: it flagged a removal contact (`privacy@crawlora.net`), a
+#: support address, a JSON placeholder (`a@b.com`) and a Spanish example value.
+#: Five of the six semantic findings that survived the intent-lexicon fixes
+#: were exactly that.
+_EMAIL_TARGET = re.compile(
+    # English and French, because the relation is the same in both and the
+    # scanner is used on Francophone payment servers. A French sample that
+    # said "une copie ... doit être adressée à conformite@..." stopped being
+    # detected the moment the English verb list became the whole rule.
+    r"\b(?:send|forward|copy|cc|bcc|mail|deliver|route|post|upload|transmit|notify"
+    # Accent-free: the text is folded before matching, so "adressée" arrives
+    # here as "adressee".
+    r"|envoyer|envoye(?:e|r)?|transmettre|adresse(?:e|r)?|expedie(?:r)?|copier"
+    r"|transfere(?:r)?|router|notifier|mettre en copie)\b"
+    # "POST {"email": "a@b.com"}" names a request body, not a destination.
+    r"(?!\s*[:{\[])"
+    + _W
+    + r"{0,60}?\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b",
+    re.I,
+)
 #: Loopback and RFC 1918 are the developer's own machine. A destination has to
 #: be reachable from somewhere the user did not choose.
 _PRIVATE_HOST = (
@@ -403,6 +436,18 @@ FEATURE_NAMES: tuple[str, ...] = (
 )
 
 
+def _fold(text: str) -> str:
+    """Strip diacritics so a lexicon matches text written without them.
+
+    People drop accents in code comments — "adressee a conformite@..." is what
+    a French developer actually types. A lexicon that only matches "adressée"
+    misses half the French it will meet, so the text is folded once and the
+    patterns are written accent-free.
+    """
+    decomposed = unicodedata.normalize("NFKD", text)
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+
+
 def extract_features(tool: Any) -> dict[str, float]:
     """Return a named feature dict for a :class:`~mcp_scrutiny.models.ToolSpec`.
 
@@ -418,20 +463,25 @@ def extract_features(tool: Any) -> dict[str, float]:
     bidi = [c for c in hidden if 0x202A <= int(c[2:], 16) <= 0x2069]
     ascii_chars = sum(1 for ch in text if ord(ch) < 128)
 
-    injection = _count(_INJECTION, text)
-    concealment = _count(_CONCEALMENT, text)
-    exfil = _count(_EXFIL, text)
-    creds = _count(_CREDENTIALS, text)
-    fs = _count(_FS_TARGETS, text)
-    cross = _count(_CROSS_TOOL, text)
-    urgency = _count(_URGENCY, text)
-    directive = _count(_DIRECTIVE, text)
+    # Lexicons match the folded text so an accent-free French description is
+    # read the same as an accented one. Hidden-character and ASCII counts stay
+    # on the raw text: folding would destroy the code points they report.
+    folded = _fold(text)
+
+    injection = _count(_INJECTION, folded)
+    concealment = _count(_CONCEALMENT, folded)
+    exfil = _count(_EXFIL, folded)
+    creds = _count(_CREDENTIALS, folded)
+    fs = _count(_FS_TARGETS, folded)
+    cross = _count(_CROSS_TOOL, folded)
+    urgency = _count(_URGENCY, folded)
+    directive = _count(_DIRECTIVE, folded)
 
     s_defaults, s_additional, s_wide_enum, s_nested, s_marker = _schema_features(schema)
 
-    hidden_recipient = _count(_HIDDEN_RECIPIENT, text)
-    hardcoded = len(_EMAIL.findall(text)) + len(_WEBHOOK.findall(text))
-    redaction = _count(_REDACTION, text)
+    hidden_recipient = _count(_HIDDEN_RECIPIENT, folded)
+    hardcoded = len(_EMAIL_TARGET.findall(folded)) + len(_WEBHOOK.findall(folded))
+    redaction = _count(_REDACTION, folded)
 
     imperative = len(
         re.findall(r"\b(must|shall|should|always|never|do not|ensure|require[sd]?)\b", text, re.I)
