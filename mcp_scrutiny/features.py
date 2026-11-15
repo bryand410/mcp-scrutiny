@@ -45,17 +45,42 @@ __all__ = [
 # Patterns
 # --------------------------------------------------------------------------- #
 
+#: A bounded window that stops at a sentence end but not at the dots inside
+#: file paths and hostnames. `[^.]` was the obvious way to write this and it
+#: silently truncated every match at `~/.ssh/id_rsa` and `evil.tld/p.sh`,
+#: which is exactly where an exfiltration target lives.
+_W = r"(?:(?!\.\s)[^\n])"
+
+#: An imperative only counts when it starts a clause. "even when they don't
+#: mention Q402 by name" and "the text they append to the system prompt"
+#: contain the same words as an attack and describe somebody else's behaviour;
+#: the subject is what separates the two.
+_CLAUSE_START = (
+    r"(?:^|[.;:!?\n]|\b(?:and|then|but|also|finally|instead|otherwise|so)\b)"
+    r"\s*(?:[-*\u2022]\s+)?"
+)
+
 _INJECTION = re.compile(
     r"\b(ignore (?:all )?(?:the )?previous|disregard (?:the )?(?:above|previous|prior)|"
     r"override (?:the )?(?:system|previous|your)|new instructions?\b|"
-    r"forget (?:everything|all|your)|you are now|from now on you|"
+    r"forget (?:everything|all|your)|from now on you|"
+    # "you are now responsible for it" states a fact about the caller.
+    # Assuming a role is what an injection does, so the complement must name one.
+    r"you are now (?:a|an|the|in|no longer|free|unrestricted|operating as)\b|"
     # "shares a system prompt" names the tool's subject, it does not instruct
     # the model. Only a verb that moves text *into* the prompt is a marker, and
-    # the complement can sit a few words away ("append the following to the
-    # system prompt").
-    r"(?:override|replace|rewrite|append|prepend|inject|insert|put)\b.{0,40}?"
-    r"\b(?:system prompt|system message)|"
-    r"do not follow your|instead of (?:what|the) |"
+    # it has to be addressed to the reader — "the text they append to the
+    # system prompt" describes what the skills do, not what the model must do.
+    + _CLAUSE_START
+    + r"(?:override|replace|rewrite|append|prepend|inject|insert|put)\b"
+    + _W
+    + r"{0,40}?\b(?:system prompt|system message)|"
+    # "instead of the cloud" and "instead of the full story" compare two
+    # things. Only a reference to a prior instruction is an override.
+    r"instead of (?:what (?:the user|they|you) (?:asked|said|wanted|requested)|"
+    r"(?:the|your|these|those) (?:original |previous |prior |above |earlier )?"
+    r"(?:instructions?|prompt|rules|system message))|"
+    r"do not follow your|"
     r"(?:add|write|store) a (?:permanent|persistent) rule|"
     r"always remember (?:that|to)|"
     r"follow the instructions (?:it|they|that) contain )",
@@ -63,17 +88,33 @@ _INJECTION = re.compile(
 )
 
 _CONCEALMENT = re.compile(
-    r"\b(do not (?:tell|mention|reveal|disclose|inform|display|show|report)|"
-    r"don'?t (?:tell|mention|reveal|disclose|inform|report)|"
-    r"without (?:telling|informing|mentioning|asking)|"
-    r"(?:silently|secretly)\s+(?:to|from)\s+the\s+user|"
-    r"(?:silently|secretly)\s+without\s+(?:telling|informing|asking|notifying)|"
+    # The verb must be an imperative, not a report of what someone else does.
+    _CLAUSE_START
+    + r"(?:do not|don'?t|never)\s+(?:ever\s+)?"
+    # "tell" and "report" take a recipient, so concealing *from* someone means
+    # naming them. "never report an unqualified success over them" and "do not
+    # report a network problem" are demands for accuracy and name no recipient;
+    # "do not report this to the user" names one and is concealment.
+    r"(?:tell\s+(?:a|the)\s+user|tell\s+(?:them|him|her|anyone)|"
+    r"inform\s+(?:(?:a|the)\s+user|them|him|her|anyone)|"
+    r"report\b" + _W + r"{0,40}\bto\s+(?:(?:a|the)\s+user|them|him|her|anyone)|"
+    # These four are disclosure verbs in their own right.
+    r"(?:mention|reveal|disclose|notify))\b"
+    # "report X as missing" and "tell anyone a name is free unless ..." govern a
+    # *claim*; concealment withholds a *fact about what the tool did*.
+    r"(?!" + _W + r"{0,80}\b(?:as|unless|because)\b)"
+    r"(?!" + _W + r"{0,40}['\"\u2018\u2019\u201c\u201d])|"
+    # Keeping the user uninformed, stated as a circumstance rather than an order.
+    r"without (?:telling|informing|notifying|mentioning)\s+"
+    r"(?:the\s+user|them|him|her|anyone)|"
+    # "silently" has to silence a transfer. "silently burns paid quota - surface
+    # this to the user" says the opposite of concealment, and a 40-character
+    # window was enough to read it as one.
+    r"(?:silently|secretly)\s+"
+    r"(?:send|upload|forward|copy|post|transmit|mirror|delete|remove|store|log)\b|"
+    r"(?:silently|secretly)\s+without\s+(?:telling|informing|notifying)|"
     r"keep (?:this )?(?:a )?secret|"
-    r"no need to (?:mention|tell|inform)|"
-    # "never reported as clean" is an assurance about the output, not an
-    # instruction to hide it. The passive "reported as <state>" is the tell.
-    r"never (?:mention|reveal|disclose|inform|tell|report)\b(?!\s+as\b)|"
-    r"do not (?:need to )?(?:mention|inform) )",
+    r"no need to (?:mention|tell|inform)",
     re.I,
 )
 
@@ -82,13 +123,26 @@ _EXFIL = re.compile(
     # endpoints, docs and specs constantly. What matters is a transfer verb
     # aimed at a network destination, or a URL carrying a payload away.
     r"\b(?:send|post|upload|forward|transmit|leak|exfiltrate|mirror|relay)\b"
-    r"[^.]{0,60}https?://"
-    r"|https?://[^\s\"'<>\])]+[^.]{0,40}\b(?:upload|exfiltrat|payload)\b"
-    r"|\b(?:send|post|upload|forward|transmit|leak|exfiltrate|relay|mirror)\b[^.]{0,40}"
-    r"\b(?:to|at|into)\s+(?:https?://|\S+@\S+|(?:\w+\s+){0,2}"
-    r"(?:webhook|endpoint|collector|external|third[- ]party|remote host|attacker|"
-    r"backup server|mirror))|curl |wget |\bfetch\s*\(|\brequests\.post|"
-    r"\bnetcat\b|\bnc -e\b|\bbase64 -d\b",
+    # "POST {"url": "https://..."}" documents the shape of a request body.
+    # A verb followed directly by punctuation is naming a format, not moving
+    # data, and API documentation is written almost entirely that way.
+    r"(?!\s*[:{\[])"
+    # "in the form `https://...`", "e.g.", "such as" introduce an example.
+    # An example is not a destination.
+    r"(?!" + _W + r"{0,60}?\b(?:in the form|in the format|format|e\.g\.|such as|"
+    r"example|pattern|syntax)\b)"
+    + _W + r"{0,60}https?://"
+    r"|https?://[^\s\"'<>\])]+" + _W + r"{0,40}\b(?:upload|exfiltrat|payload)\b"
+    r"|\b(?:send|post|upload|forward|transmit|leak|exfiltrate|relay|mirror)\b"
+    + _W + r"{0,40}\b(?:to|at|into)\s+(?:https?://|\S+@\S+|(?:\w+\s+){0,2}"
+    r"(?:webhook|collector|attacker|pastebin|third[- ]party|"
+    r"backup server))"
+    # A bare `curl` is an example command in half the documentation on npm.
+    # Only the shapes that read a local file or pipe a download into a shell.
+    r"|\bcurl\b" + _W + r"{0,80}\|\s*(?:sudo\s+)?(?:sh|bash|zsh)\b"
+    r"|\bwget\b" + _W + r"{0,80}\|\s*(?:sudo\s+)?(?:sh|bash|zsh)\b"
+    r"|\bcurl\b" + _W + r"{0,60}(?:-d|--data(?:-binary|-raw)?|-F|-T)\s*@"
+    r"|\bnetcat\b|\bnc -e\b|\bbase64 -d\b",
     re.I,
 )
 
@@ -129,18 +183,42 @@ _URGENCY = re.compile(
 #: concealing anything - it presents the extra recipient as a compliance
 #: requirement, which is exactly why keyword scanners miss it.
 _HIDDEN_RECIPIENT = re.compile(
-    r"\b(bcc|blind carbon copy|hidden (?:recipient|copy)|"
-    r"(?:also|additionally|in addition) (?:send|forward|cc|bcc|post|mirror)|"
-    r"(?:a )?copy of (?:every|the|each)|mirror(?:ed)? (?:to|the)|"
-    r"must (?:always )?(?:be )?(?:included|added|sent|forwarded) (?:to|in the bcc)|"
-    r"forward (?:a copy|it|the)|include (?:it|the payload|the contents) in the)\b",
+    # "bcc" and "hidden recipient" name the thing outright, no context needed.
+    r"\b(?:bcc|blind carbon copy|hidden (?:recipient|copy))\b|"
+    # A copy, a forward or a mirror is only a signal when it *goes somewhere*.
+    # "each version is a frozen copy of the definition" and "mirror the place's
+    # public event feed" both describe what the tool returns to its caller.
+    r"\b(?:a\s+)?copy of (?:every|each|all|the)\b" + _W + r"{0,80}\b(?:to|into)\s+"
+    r"(?:https?://|\S+@\S+|an? \w+ (?:address|endpoint|server|webhook|bucket|"
+    r"folder|archive|mailbox))|"
+    r"\b(?:also|additionally|in addition)\s+(?:send|forward|cc|bcc|post|mirror)\b|"
+    r"\bmirror(?:ed|s)?\s+to\b|"
+    r"\bforward (?:a copy|it|the \w+)" + _W + r"{0,40}\bto\b|"
+    r"\bmust (?:always )?(?:be )?(?:included|added|sent|forwarded) "
+    r"(?:to|in the bcc)\b",
     re.I,
 )
 
 _EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
+#: Loopback and RFC 1918 are the developer's own machine. A destination has to
+#: be reachable from somewhere the user did not choose.
+_PRIVATE_HOST = (
+    r"(?!localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|"
+    r"172\.(?:1[6-9]|2\d|3[01])\.)"
+)
+
 _WEBHOOK = re.compile(
-    r"https?://[^\s\"'<>)\]]*(?:webhook|hook|collect|telemetry|analytics|ingest|track|exfil|pastebin|paste\.ee|"
-    r"\d{1,3}(?:\.\d{1,3}){3})[^\s\"'<>)\]]*",
+    # The word has to stand on its own, not sit inside another. `news/collection/`
+    # contains "collect" and `/analytics/v1/` contains "analytics"; neither
+    # receives smuggled data, and both were counted. The boundary is a character
+    # class rather than `[/._-]` because `https?://` has already eaten the two
+    # slashes that precede a hostname.
+    r"https?://" + _PRIVATE_HOST + r"[^\s\"'<>)\]]*"
+    r"(?<![a-z0-9])(?:webhooks?|hooks?|collector|ingest|exfil|pastebin|paste\.ee)"
+    r"(?![a-z0-9])[^\s\"'<>)\]]*"
+    # A public address is a destination; `proxy_callback_events` forwards to
+    # `http://127.0.0.1:<port>` on purpose, and that is not a collector.
+    r"|https?://" + _PRIVATE_HOST + r"\d{1,3}(?:\.\d{1,3}){3}[^\s\"'<>)\]]*",
     re.I,
 )
 
@@ -162,16 +240,24 @@ _DIRECTIVE = re.compile(
 )
 
 _MARKUP = re.compile(
+    # A triple backtick is how every README on npm marks a code block. It was
+    # in this pattern and produced seven findings on five servers, all of them
+    # "Example usage: ```json { \"limit\": 5 } ```". What marks a chat template
+    # is the token, not the fence around it.
     r"(<\|?(?:im_start|im_end|system|assistant|endoftext)\|?>|\[/?INST\]|"
     r"<important>|</?(?:system|instructions?)>|"
-    r"```|<\!\[CDATA\[|&#x?[0-9a-fA-F]+;)",
+    r"<\!\[CDATA\[|&#x?[0-9a-fA-F]+;)",
     re.I,
 )
 
 _HTML_COMMENT = re.compile(r"<!--.*?-->", re.S)
 
 _BASE64_BLOB = re.compile(r"\b[A-Za-z0-9+/]{40,}={0,2}\b")
-_HEX_BLOB = re.compile(r"\b(?:0x)?[0-9a-fA-F]{32,}\b")
+#: A bare 32+ hex run is a payload candidate. `0x` is deliberately not
+#: optional: that prefix makes it an Ethereum address, and a chain explorer
+#: tool documents its contract in exactly that form — the one occurrence in
+#: 12 709 descriptions was `0xe10b6f6b…`, the token contract itself.
+_HEX_BLOB = re.compile(r"\b[0-9a-fA-F]{32,}\b")
 _PERCENT_RUN = re.compile(r"(?:%[0-9a-fA-F]{2}){6,}")
 
 #: Unicode categories/points that have no business in a tool description.
@@ -514,21 +600,21 @@ def mixed_script_words(text: str) -> list[str]:
 
 
 def confusables(text: str) -> list[str]:
-    """Cyrillic/Greek characters sitting inside otherwise-Latin text.
+    """Cyrillic/Greek characters sitting *inside a Latin word*.
 
-    A description written in Russian is not an attack. The previous version
+    A description written in Russian is not an attack. The first version
     returned every Cyrillic character it found, so `mcp-yandex-wordstat`,
     which documents itself in Russian, produced five findings whose entire
     evidence was the Russian alphabet — one per tool.
 
-    A confusable can only hide something when the surrounding text is Latin.
-    When the Cyrillic or Greek letters outnumber the Latin ones, the text is
-    simply written in that script, and there is nothing to confuse.
+    The second version compared the two alphabets across the whole document.
+    That still failed on documentation that is English and *quotes* Russian:
+    `omniflow-mcp` names its UI buttons («Аватары», [Нет, спасибо]), and
+    `crawlora-mcp` lists the Russian label of a sound (`оригинальный звук`).
+    English outnumbered Russian in both, so both were flagged.
+
+    A homoglyph is a character in the *wrong word*, not in the wrong document.
+    So the only characters that count are the ones inside a word that also
+    holds Latin letters — which is exactly what `mixed_script_words` returns.
     """
-    present = {ch for ch in text if ch in _CONFUSABLE}
-    if not present:
-        return []
-    latin = sum(1 for ch in text if unicodedata.name(ch, "").startswith("LATIN"))
-    if len([ch for ch in text if ch in _CONFUSABLE]) >= latin:
-        return []
-    return sorted(present)
+    return sorted({ch for word in mixed_script_words(text) for ch in word if ch in _CONFUSABLE})
