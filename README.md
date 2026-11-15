@@ -22,11 +22,14 @@ report: [English](docs/2026-10-francophone-mobile-money-mcp-security.md) ·
 [Français](docs/2026-10-securite-mcp-mobile-money-francophone.md). The same exercise found a false
 positive in this scanner that mattered more than any finding in it, and the report says so.
 
-**Then run against 71 of the most-installed public MCP servers** — 420 tool definitions, ten
-findings, and four critical false positives that this scanner produced on its own. Both causes were
-regular expressions matching the wrong grammatical role; both are fixed, with the before/after
-scores measured. Read the survey:
-[What 71 public MCP servers expose to the model](https://github.com/bryand410/mcp-survey/blob/main/docs/2026-11-public-mcp-survey.md).
+**Then run against every public MCP server with a measurable install base** — 514 packages,
+12 709 tool definitions, 165 structural toxic flows, and five separate classes of false positive
+that this scanner produced on its own. Every one was found by reading the output rather than by
+trusting the count: a regex matching the passive voice, a model probability mapped to `critical`,
+Chinese prose containing "ID", emoji carrying `U+FE0F`, field lists matching the base64 alphabet,
+and Russian prose flagged as homoglyphs. Together they took the semantic count from 482 to 87 on
+the same corpus. Read the survey:
+[What 514 public MCP servers expose to the model](https://github.com/bryand410/mcp-survey/blob/main/docs/2026-11-public-mcp-survey.md).
 
 ---
 
