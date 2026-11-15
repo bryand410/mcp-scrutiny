@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "If you use this software, cite it as below."
+title: "mcp-scrutiny"
+abstract: >-
+  Static and semantic security scanner for Model Context Protocol servers. It
+  answers four questions about an MCP deployment: whether anything is launched
+  from a floating version, whether a tool definition changed since it was
+  approved, whether a description contains instructions the model would obey,
+  and whether the tools combine into a capability path no single tool should
+  have. Measured against 514 public MCP servers and 12 709 tool definitions;
+  the survey it produced is linked below.
+authors:
+  - family-names: "Tamouffe Teyo"
+    given-names: "Ulrich Bryand"
+    alias: "bryand410"
+version: 0.1.7
+date-released: 2026-11-15
+license: Apache-2.0
+repository-code: "https://github.com/bryand410/mcp-scrutiny"
+url: "https://pypi.org/project/mcp-scrutiny/"
+keywords:
+  - Model Context Protocol
+  - MCP
+  - security scanner
+  - tool poisoning
+  - prompt injection
+  - supply chain
+references:
+  - type: generic
+    title: "What 514 public MCP servers expose to the model"
+    url: "https://github.com/bryand410/mcp-survey/blob/main/docs/2026-11-public-mcp-survey.md"
