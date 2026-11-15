@@ -514,5 +514,21 @@ def mixed_script_words(text: str) -> list[str]:
 
 
 def confusables(text: str) -> list[str]:
-    """Characters from the Cyrillic/Greek confusable set, if any appear."""
-    return sorted({ch for ch in text if ch in _CONFUSABLE})
+    """Cyrillic/Greek characters sitting inside otherwise-Latin text.
+
+    A description written in Russian is not an attack. The previous version
+    returned every Cyrillic character it found, so `mcp-yandex-wordstat`,
+    which documents itself in Russian, produced five findings whose entire
+    evidence was the Russian alphabet — one per tool.
+
+    A confusable can only hide something when the surrounding text is Latin.
+    When the Cyrillic or Greek letters outnumber the Latin ones, the text is
+    simply written in that script, and there is nothing to confuse.
+    """
+    present = {ch for ch in text if ch in _CONFUSABLE}
+    if not present:
+        return []
+    latin = sum(1 for ch in text if unicodedata.name(ch, "").startswith("LATIN"))
+    if len([ch for ch in text if ch in _CONFUSABLE]) >= latin:
+        return []
+    return sorted(present)
